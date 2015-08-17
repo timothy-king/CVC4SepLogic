@@ -86,6 +86,8 @@ libutil_la_SOURCES = \
 	array_store_all.cpp \
 	emptyset.h \
 	emptyset.cpp \
+	sepconst.h \
+	sepconst.cpp \
 	model.h \
 	model.cpp \
 	sort_inference.h \

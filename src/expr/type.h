@@ -48,6 +48,7 @@ class IntegerType;
 class RealType;
 class StringType;
 class RoundingModeType;
+class RefType;
 class BitVectorType;
 class ArrayType;
 class SetType;
@@ -276,7 +277,7 @@ public:
    * @return true if the type is a floating-point type
    */
   bool isFloatingPoint() const;
-
+  
   /**
    * Is this a function type?
    * @return true if the type is a function type
@@ -308,6 +309,12 @@ public:
    */
   bool isSExpr() const;
 
+  /**
+   * Is this a Ref type?
+   * @return true if the type is a Ref type
+   */
+  bool isRef() const;
+  
   /**
    * Is this an array type?
    * @return true if the type is a array type
@@ -437,6 +444,19 @@ public:
 };/* class RoundingModeType */
 
 
+/**
+ * Class encapsulating a ref type.
+ */
+class CVC4_PUBLIC RefType : public Type {
+
+public:
+
+  /** Construct from the base type */
+  RefType(const Type& type = Type()) throw(IllegalArgumentException);
+
+  /** Get the index type */
+  Type getRefType() const;
+};/* class RefType */
 
 /**
  * Class encapsulating a function type.

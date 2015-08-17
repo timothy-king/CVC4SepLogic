@@ -42,7 +42,9 @@ OPTIONS_FILES_SRCS = \
 	../theory/sets/options.cpp \
 	../theory/sets/options.h \
 	../theory/fp/options.cpp \
-	../theory/fp/options.h
+	../theory/fp/options.h \
+	../theory/sep/options.cpp \
+	../theory/sep/options.h
 
 OPTIONS_FILES = \
 	$(patsubst %.cpp,%,$(filter %.cpp,$(OPTIONS_FILES_SRCS)))

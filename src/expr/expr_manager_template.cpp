@@ -590,6 +590,11 @@ FloatingPointType ExprManager::mkFloatingPointType(unsigned exp, unsigned sig) c
   return FloatingPointType(Type(d_nodeManager, new TypeNode(d_nodeManager->mkFloatingPointType(exp,sig))));
 }
 
+RefType ExprManager::mkRefType(Type ref) const {
+  NodeManagerScope nms(d_nodeManager);
+  return RefType(Type(d_nodeManager, new TypeNode(d_nodeManager->mkRefType(*ref.d_typeNode))));
+}
+
 BitVectorType ExprManager::mkBitVectorType(unsigned size) const {
   NodeManagerScope nms(d_nodeManager);
   return BitVectorType(Type(d_nodeManager, new TypeNode(d_nodeManager->mkBitVectorType(size))));

@@ -52,7 +52,8 @@ public:
     THEORY_SETS,
     THEORY_STRINGS,
     THEORY_UF,
-    THEORY_FP
+    THEORY_FP,
+    THEORY_SEP
   };
 
 private:
@@ -347,6 +348,8 @@ private:
 
   void addFloatingPointOperators();
 
+  void addSepOperators();
+  
 };/* class Smt2 */
 
 }/* CVC4::parser namespace */

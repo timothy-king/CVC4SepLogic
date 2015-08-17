@@ -367,9 +367,12 @@ public:
    */
   SExprType mkSExprType(const std::vector<Type>& types);
 
-  /** Make a type representing a floating-point type with the given parameters. */
+  /** Make a type representing a reference to a type. */
   FloatingPointType mkFloatingPointType(unsigned exp, unsigned sig) const;
 
+  /** Make a type representing a floating-point type with the given parameters. */
+  RefType mkRefType(Type ref) const;
+  
   /** Make a type representing a bit-vector of the given size. */
   BitVectorType mkBitVectorType(unsigned size) const;
 

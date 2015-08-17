@@ -772,13 +772,16 @@ public:
   inline TypeNode mkFloatingPointType(unsigned exp, unsigned sig);  
   inline TypeNode mkFloatingPointType(FloatingPointSize fs);
 
+  /** Make the type of ref with the given parameterization */
+  inline TypeNode mkRefType(TypeNode refType);
+  
   /** Make the type of bitvectors of size <code>size</code> */
   inline TypeNode mkBitVectorType(unsigned size);
 
   /** Make the type of arrays with the given parameterization */
   inline TypeNode mkArrayType(TypeNode indexType, TypeNode constituentType);
 
-  /** Make the type of arrays with the given parameterization */
+  /** Make the type of set with the given parameterization */
   inline TypeNode mkSetType(TypeNode elementType);
 
   /** Make a type representing a constructor with the given parameterization */
@@ -1085,6 +1088,15 @@ inline TypeNode NodeManager::mkFloatingPointType(unsigned exp, unsigned sig) {
 
 inline TypeNode NodeManager::mkFloatingPointType(FloatingPointSize fs) {
   return TypeNode(mkTypeConst<FloatingPointSize>(fs));
+}
+
+inline TypeNode NodeManager::mkRefType(TypeNode refType) {
+  CheckArgument(!refType.isNull(), refType,
+                "unexpected NULL ref type");
+  CheckArgument(!refType.isFunctionLike(), refType,
+                "cannot reference function-like types in sep");
+  Debug("sets") << "making ref type " << refType << std::endl;
+  return mkTypeNode(kind::REF_TYPE, refType);
 }
 
 inline TypeNode NodeManager::mkArrayType(TypeNode indexType,

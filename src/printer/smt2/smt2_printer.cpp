@@ -820,6 +820,10 @@ static string smtKindString(Kind k) throw() {
   case kind::FLOATINGPOINT_TO_SBV: return "fp.to_sbv";
   case kind::FLOATINGPOINT_TO_REAL: return "fp.to_real";
 
+  //sep theory
+  case kind::SEP_STAR: return "sep";
+  case kind::SEP_PTO: return "pto";
+  
   default:
     ; /* fall through */
   }

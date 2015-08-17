@@ -298,6 +298,12 @@ bool Type::isSExpr() const {
   return d_typeNode->isSExpr();
 }
 
+/** Is this a Ref type? */
+bool Type::isRef() const {
+  NodeManagerScope nms(d_nodeManager);
+  return d_typeNode->isRef();
+}
+
 /** Is this an array type? */
 bool Type::isArray() const {
   NodeManagerScope nms(d_nodeManager);
@@ -501,6 +507,11 @@ RecordType::RecordType(const Type& t) throw(IllegalArgumentException) :
 SExprType::SExprType(const Type& t) throw(IllegalArgumentException) :
   Type(t) {
   CheckArgument(isNull() || isSExpr(), this);
+}
+
+RefType::RefType(const Type& t) throw(IllegalArgumentException) :
+  Type(t) {
+  CheckArgument(isNull() || isRef(), this);
 }
 
 ArrayType::ArrayType(const Type& t) throw(IllegalArgumentException) :

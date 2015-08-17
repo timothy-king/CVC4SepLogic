@@ -466,12 +466,18 @@ public:
   /** Is this the Rounding Mode type? */
   bool isRoundingMode() const;
 
+  /** Is this a Ref type? */
+  bool isRef() const;
+  
   /** Is this an array type? */
   bool isArray() const;
 
   /** Is this a Set type? */
   bool isSet() const;
 
+  /** Get the ref constituent type */
+  TypeNode getRefConstituentType() const;
+  
   /** Get the index type (for array types) */
   TypeNode getArrayIndexType() const;
 
@@ -875,8 +881,17 @@ inline bool TypeNode::isRoundingMode() const {
     getConst<TypeConstant>() == ROUNDINGMODE_TYPE;
 }
 
+inline bool TypeNode::isRef() const {
+  return getKind() == kind::REF_TYPE;
+}
+
 inline bool TypeNode::isArray() const {
   return getKind() == kind::ARRAY_TYPE;
+}
+
+inline TypeNode TypeNode::getRefConstituentType() const {
+  Assert(isRef());
+  return (*this)[0];
 }
 
 inline TypeNode TypeNode::getArrayIndexType() const {

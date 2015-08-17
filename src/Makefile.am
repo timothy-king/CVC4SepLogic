@@ -20,7 +20,7 @@ AM_CPPFLAGS = \
 AM_CXXFLAGS = -Wall -Wno-unknown-pragmas -Wno-parentheses $(FLAG_VISIBILITY_HIDDEN)
 
 SUBDIRS = lib options expr util prop/minisat prop/bvminisat . parser compat bindings main
-THEORIES = builtin booleans uf arith bv fp arrays datatypes sets strings quantifiers idl
+THEORIES = builtin booleans uf arith bv fp arrays sep datatypes sets strings quantifiers idl
 
 lib_LTLIBRARIES = libcvc4.la
 
@@ -424,7 +424,12 @@ libcvc4_la_SOURCES = \
 	theory/fp/theory_fp.cpp \
 	theory/fp/theory_fp_rewriter.h \
 	theory/fp/theory_fp_rewriter.cpp \
-	theory/fp/theory_fp_type_rules.h
+	theory/fp/theory_fp_type_rules.h \
+	theory/sep/theory_sep.h \
+	theory/sep/theory_sep.cpp \
+	theory/sep/theory_sep_rewriter.h \
+	theory/sep/theory_sep_rewriter.cpp \
+	theory/sep/theory_sep_type_rules.h
 
 nodist_libcvc4_la_SOURCES = \
 	smt/smt_options.cpp \
