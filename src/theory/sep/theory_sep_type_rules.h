@@ -58,8 +58,22 @@ struct SepStarTypeRule {
     }
     return btype;
   }
+};/* struct SepStarTypeRule */
 
-};/* struct SepStoreTypeRule */
+struct SepLabelTypeRule {
+  inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
+    throw (TypeCheckingExceptionPrivate, AssertionException) {
+    TypeNode btype = nodeManager->booleanType();
+    Assert(n.getKind() == kind::SEP_LABEL);
+    if( check ){
+      TypeNode ctype = n[0].getType( check );
+      if( ctype!=btype ){
+        throw TypeCheckingExceptionPrivate(n, "child of sep label is not boolean");
+      }
+    }
+    return btype;
+  }
+};/* struct SepLabelTypeRule */
 
 struct SepProperties {
   inline static Cardinality computeCardinality(TypeNode type) {

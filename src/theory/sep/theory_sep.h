@@ -31,6 +31,8 @@ namespace theory {
 namespace sep {
 
 class TheorySep : public Theory {
+  typedef context::CDHashSet<Node, NodeHashFunction> NodeSet;
+  typedef context::CDHashMap<Node, Node, NodeHashFunction> NodeNodeMap;
 
   /////////////////////////////////////////////////////////////////////////////
   // MISC
@@ -111,7 +113,6 @@ class TheorySep : public Theory {
   /////////////////////////////////////////////////////////////////////////////
   // MAIN SOLVER
   /////////////////////////////////////////////////////////////////////////////
-
   public:
 
   void check(Effort e);
@@ -175,8 +176,14 @@ class TheorySep : public Theory {
   /** The conflict node */
   Node d_conflictNode;
 
+  //cache for positive polarity start reduction
+  NodeSet d_star_pos_reduce;
+  
+  std::map< Node, std::map< int, Node > > d_label_map;
+  
+  Node getLabel( Node atom, int child, Node lbl );
+  Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
 public:
-
   eq::EqualityEngine* getEqualityEngine() {
     return &d_equalityEngine;
   }

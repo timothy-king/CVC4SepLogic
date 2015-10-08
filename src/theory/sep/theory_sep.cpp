@@ -36,14 +36,15 @@ TheorySep::TheorySep(context::Context* c, context::UserContext* u, OutputChannel
   Theory(THEORY_SEP, c, u, out, valuation, logicInfo),
   d_notify(*this),
   d_equalityEngine(d_notify, c, "theory::sep::TheorySep", true),
-  d_conflict(c, false)
+  d_conflict(c, false),
+  d_star_pos_reduce(u)
 {
   d_true = NodeManager::currentNM()->mkConst<bool>(true);
   d_false = NodeManager::currentNM()->mkConst<bool>(false);
 
   // The kinds we are treating as function application in congruence
   d_equalityEngine.addFunctionKind(kind::SEP_PTO);
-  d_equalityEngine.addFunctionKind(kind::SEP_STAR);
+  //d_equalityEngine.addFunctionKind(kind::SEP_STAR);
 
 }
 
@@ -144,7 +145,7 @@ Node TheorySep::explain(TNode literal)
 
 
 void TheorySep::addSharedTerm(TNode t) {
-  Debug("sep::sharing") << "TheorySep::addSharedTerm(" << t << ")" << std::endl;
+  Debug("sep") << "TheorySep::addSharedTerm(" << t << ")" << std::endl;
   d_equalityEngine.addTriggerTerm(t, THEORY_SEP);
 }
 
@@ -163,9 +164,29 @@ EqualityStatus TheorySep::getEqualityStatus(TNode a, TNode b) {
 }
 
 
-void TheorySep::computeCareGraph()
-{
-  Theory::computeCareGraph();
+void TheorySep::computeCareGraph() {
+  Debug("sharing") << "Theory::computeCareGraph<" << getId() << ">()" << endl;
+  for (unsigned i = 0; i < d_sharedTerms.size(); ++ i) {
+    TNode a = d_sharedTerms[i];
+    TypeNode aType = a.getType();
+    for (unsigned j = i + 1; j < d_sharedTerms.size(); ++ j) {
+      TNode b = d_sharedTerms[j];
+      if (b.getType() != aType) {
+        // We don't care about the terms of different types
+        continue;
+      }
+      switch (d_valuation.getEqualityStatus(a, b)) {
+      case EQUALITY_TRUE_AND_PROPAGATED:
+      case EQUALITY_FALSE_AND_PROPAGATED:
+        // If we know about it, we should have propagated it, so we can skip
+        break;
+      default:
+        // Let's split on it
+        addCarePair(a, b);
+        break;
+      }
+    }
+  }
 }
 
 
@@ -185,9 +206,8 @@ void TheorySep::collectModelInfo( TheoryModel* m, bool fullModel )
 /////////////////////////////////////////////////////////////////////////////
 
 
-void TheorySep::presolve()
-{
-  Trace("sep") << "Presolving \n";
+void TheorySep::presolve() {
+  Trace("sep") << "Presolving" << std::endl;
 }
 
 
@@ -204,35 +224,52 @@ void TheorySep::check(Effort e) {
   getOutputChannel().spendResource(options::theoryCheckStep());
 
   TimerStat::CodeTimer checkTimer(d_checkTime);
+  Trace("sep-check") << "Sep::check(): " << e << endl;
 
-  while (!done() && !d_conflict)
-  {
+  while( !done() && !d_conflict ){
     // Get all the assertions
     Assertion assertion = get();
     TNode fact = assertion.assertion;
 
-    Debug("sep") << "TheorySep::check(): processing " << fact << std::endl;
+    Trace("sep-assert") << "TheorySep::check(): processing " << fact << std::endl;
 
     bool polarity = fact.getKind() != kind::NOT;
     TNode atom = polarity ? fact : fact[0];
-
-    // Do the work
-    switch (fact.getKind()) {
-      case kind::EQUAL:
-        d_equalityEngine.assertEquality(fact, true, fact);
-        break;
-      case kind::SEP_PTO:
-        d_equalityEngine.assertPredicate(fact, true, fact);
-        break;
-      case kind::SEP_STAR:
-        d_equalityEngine.assertPredicate(fact, true, fact);
-        break;
-      default:
-        Unreachable();
+    TNode s_atom = atom.getKind()==kind::SEP_LABEL ? atom[0] : atom;
+    TNode s_lbl = atom.getKind()==kind::SEP_LABEL ? atom[1] : TNode::null();
+    
+    if( s_atom.getKind()==kind::SEP_STAR ){
+      if( polarity ){
+        if( d_star_pos_reduce.find( atom )==d_star_pos_reduce.end() ){
+          Trace("sep-lemma-debug") << "Reducing positive star " << atom << std::endl;
+          d_star_pos_reduce.insert( atom );
+          if( s_atom.getNumChildren()>0 ){
+            std::vector< Node > children;
+            for( unsigned i=0; i<s_atom.getNumChildren(); i++ ){
+              Node lblc = getLabel( s_atom, i, s_lbl );
+              std::map< Node, Node > visited;
+              Node lc = applyLabel( s_atom[i], lblc, visited );
+              children.push_back( lc );
+            }
+            Node conc = children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children );
+            Node lem = NodeManager::currentNM()->mkNode( kind::IMPLIES, atom, conc );
+            Trace("sep-lemma") << "Sep::Lemma : " << lem << std::endl;
+            d_out->lemma( lem );
+          }
+        }
+      }
+    }else{
+      Debug("sep") << "Asserting " << atom << " to EE..." << std::endl;
+      if( atom.getKind()==kind::EQUAL ){
+        d_equalityEngine.assertEquality(atom, polarity, fact);
+      }else{
+        d_equalityEngine.assertPredicate(atom, polarity, fact);
+      }
+      Debug("sep") << "Done asserting " << atom << " to EE." << std::endl;
     }
   }
 
-  Trace("sep") << "Sep::check(): done" << endl;
+  Trace("sep-check") << "Sep::check(): " << e << " done" << endl;
 }
 
 
@@ -241,6 +278,7 @@ Node TheorySep::getNextDecisionRequest() {
 }
 
 void TheorySep::conflict(TNode a, TNode b) {
+  Trace("sep-conflict") << "Sep::conflict : " << a << " " << b << std::endl;
   if (a.getKind() == kind::CONST_BOOLEAN) {
     d_conflictNode = explain(a.iffNode(b));
   } else {
@@ -249,6 +287,54 @@ void TheorySep::conflict(TNode a, TNode b) {
   d_conflict = true;
 }
 
+Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
+  std::map< int, Node >::iterator it = d_label_map[atom].find( child );
+  if( it==d_label_map[atom].end() ){
+    std::stringstream ss;
+    if( lbl.isNull() ){
+      ss << "__L";
+    }else{
+      ss << lbl;
+    }
+    ss << child;
+    Node lbl = NodeManager::currentNM()->mkSkolem( ss.str(), NodeManager::currentNM()->booleanType(), "", NodeManager::SKOLEM_EXACT_NAME );
+    d_label_map[atom][child] = lbl;
+    return lbl;
+  }else{
+    return (*it).second;
+  }
+}
+
+Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) {
+  Assert( n.getKind()!=kind::SEP_LABEL );
+  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_PTO ){
+    return NodeManager::currentNM()->mkNode( kind::SEP_LABEL, n, lbl );
+  }else if( !n.getType().isBoolean() || n.getNumChildren()==0 ){
+    return n;
+  }else{
+    std::map< Node, Node >::iterator it = visited.find( n );
+    if( it!=visited.end() ){
+      std::vector< Node > children;
+      if (n.getMetaKind() == kind::metakind::PARAMETERIZED) {
+        children.push_back( n.getOperator() );
+      }
+      bool childChanged = false;
+      for( unsigned i=0; i<n.getNumChildren(); i++ ){
+        Node aln = applyLabel( n[i], lbl, visited );
+        children.push_back( aln );
+        childChanged = childChanged || aln!=n[i];
+      }
+      Node ret = n;
+      if( childChanged ){
+        ret = NodeManager::currentNM()->mkNode( n.getKind(), children );
+      }
+      visited[n] = ret;
+      return ret;
+    }else{
+      return it->second;
+    }
+  }
+}
 
 }/* CVC4::theory::sep namespace */
 }/* CVC4::theory namespace */
