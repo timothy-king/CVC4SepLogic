@@ -30,7 +30,8 @@ namespace sep {
 
 class TheorySepRewriter {
 private:
-  static void getStarChildren( Node n, std::vector< Node >& children );
+  static void getStarChildren( Node n, std::vector< Node >& children,
+                               std::vector< Node >& s_children, std::vector< Node >& ns_children );
   static bool isSpatial( Node n, std::map< Node, bool >& visited );
 public:
 

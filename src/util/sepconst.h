@@ -23,6 +23,7 @@ namespace CVC4 {
   // messy; Expr needs NilRef (because it's the payload of a
   // CONSTANT-kinded expression), and NilRef needs Expr.
   class CVC4_PUBLIC NilRef;
+  class CVC4_PUBLIC EmpStar;
 }/* CVC4 namespace */
 
 #include "expr/expr.h"
@@ -32,12 +33,9 @@ namespace CVC4 {
 namespace CVC4 {
 
 class CVC4_PUBLIC NilRef {
-
   const RefType d_type;
-
   NilRef() { }
 public:
-
   /**
    * Constructs an nil ref of the specified type. Note that the argument
    * is the type of the ref itself, NOT the type of the constituent type.
@@ -46,16 +44,13 @@ public:
 
   ~NilRef() throw() {
   }
-
   RefType getType() const { return d_type; }
-
   bool operator==(const NilRef& es) const throw() {
     return d_type == es.d_type;
   }
   bool operator!=(const NilRef& es) const throw() {
     return !(*this == es);
   }
-
   bool operator<(const NilRef& es) const throw() {
     return d_type < es.d_type;
   }
@@ -68,7 +63,6 @@ public:
   bool operator>=(const NilRef& es) const throw() {
     return !(*this < es);
   }
-
 };/* class NilRef */
 
 std::ostream& operator<<(std::ostream& out, const NilRef& es) CVC4_PUBLIC;
@@ -78,5 +72,45 @@ struct CVC4_PUBLIC NilRefHashFunction {
     return TypeHashFunction()(es.getType());
   }
 };/* struct NilRefHashFunction */
+
+
+
+class CVC4_PUBLIC EmpStar {
+
+public:
+  /**
+   * Constructs empty star.
+   */
+  EmpStar() { }
+
+  ~EmpStar() throw() {
+  }
+  bool operator==(const EmpStar& es) const throw() {
+    return true;
+  }
+  bool operator!=(const EmpStar& es) const throw() {
+    return !(*this == es);
+  }
+  bool operator<(const EmpStar& es) const throw() {
+    return false;
+  }
+  bool operator<=(const EmpStar& es) const throw() {
+    return true;
+  }
+  bool operator>(const EmpStar& es) const throw() {
+    return !(*this <= es);
+  }
+  bool operator>=(const EmpStar& es) const throw() {
+    return !(*this < es);
+  }
+};/* class EmpStar */
+
+std::ostream& operator<<(std::ostream& out, const EmpStar& es) CVC4_PUBLIC;
+
+struct CVC4_PUBLIC EmpStarHashFunction {
+  inline size_t operator()(const EmpStar& es) const {
+    return 0;
+  }
+};/* struct EmpStarHashFunction */
 
 }/* CVC4 namespace */

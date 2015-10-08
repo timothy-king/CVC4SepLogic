@@ -22,6 +22,7 @@
 #include "theory/theory.h"
 #include "util/statistics_registry.h"
 #include "theory/uf/equality_engine.h"
+#include "context/cdchunk_list.h"
 #include "context/cdhashmap.h"
 #include "context/cdhashset.h"
 #include "context/cdqueue.h"
@@ -31,6 +32,7 @@ namespace theory {
 namespace sep {
 
 class TheorySep : public Theory {
+  typedef context::CDChunkList<Node> NodeList;
   typedef context::CDHashSet<Node, NodeHashFunction> NodeSet;
   typedef context::CDHashMap<Node, Node, NodeHashFunction> NodeNodeMap;
 
@@ -111,7 +113,7 @@ class TheorySep : public Theory {
   void shutdown() { }
 
   /////////////////////////////////////////////////////////////////////////////
-  // MAIN SOLVER
+  // MAIN SOLVER#include "context/cdhashmap.h"
   /////////////////////////////////////////////////////////////////////////////
   public:
 
@@ -181,8 +183,29 @@ class TheorySep : public Theory {
   
   std::map< Node, std::map< int, Node > > d_label_map;
   
+  class HeapInfo {
+  public:
+    HeapInfo( context::Context* c );
+    ~HeapInfo(){}
+    NodeList d_pos_assertions;
+    NodeList d_neg_assertions;
+  };
+  std::map< Node, HeapInfo * > d_heap_info;
+  HeapInfo * getOrMakeHeapInfo( Node n, bool doMake = false );
+  
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
+  
+  void addAssertionToLabel( Node atom, bool polarity, Node lbl );
+  
+  bool checkHeap( Node lbl, std::map< Node, Node >& heap );
+private:
+  Node getRepresentative( Node t );
+  bool hasTerm( Node a );
+  bool areEqual( Node a, Node b );
+  bool areDisequal( Node a, Node b );
+  
+  void sendLemma( std::vector< Node >& ant, Node conc, const char * c );
 public:
   eq::EqualityEngine* getEqualityEngine() {
     return &d_equalityEngine;

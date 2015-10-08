@@ -109,10 +109,8 @@ void TheorySep::explain(TNode literal, std::vector<TNode>& assumptions) {
   // Do the work
   bool polarity = literal.getKind() != kind::NOT;
   TNode atom = polarity ? literal : literal[0];
-  //eq::EqProof * eqp = new eq::EqProof;
-  eq::EqProof * eqp = NULL;
   if (atom.getKind() == kind::EQUAL || atom.getKind() == kind::IFF) {
-    d_equalityEngine.explainEquality(atom[0], atom[1], polarity, assumptions, eqp);
+    d_equalityEngine.explainEquality(atom[0], atom[1], polarity, assumptions, NULL);
   } else {
     d_equalityEngine.explainPredicate(atom, polarity, assumptions);
   }
@@ -257,19 +255,33 @@ void TheorySep::check(Effort e) {
             d_out->lemma( lem );
           }
         }
+      }else{
+        Notice() << "Negated STAR asserted to sep theory: " << fact << std::endl;
       }
     }else{
       Debug("sep") << "Asserting " << atom << " to EE..." << std::endl;
-      if( atom.getKind()==kind::EQUAL ){
-        d_equalityEngine.assertEquality(atom, polarity, fact);
+      if( s_atom.getKind()==kind::EQUAL ){
+        d_equalityEngine.assertEquality(s_atom, polarity, fact);
       }else{
-        d_equalityEngine.assertPredicate(atom, polarity, fact);
+        d_equalityEngine.assertPredicate(s_atom, polarity, fact);
       }
       Debug("sep") << "Done asserting " << atom << " to EE." << std::endl;
     }
+    if( s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_PTO || s_atom.getKind()==kind::EMP_STAR ){
+      addAssertionToLabel( s_atom, polarity, s_lbl );
+    }
   }
 
-  Trace("sep-check") << "Sep::check(): " << e << " done" << endl;
+  if( e == EFFORT_FULL && !d_conflict ){
+    Trace("sep-process") << "Checking heap at full effort..." << std::endl;
+    std::map< Node, Node > heap;
+    bool builtModel = checkHeap( Node::null(), heap );
+    Trace("sep-process") << "Done checking heap at full effort, success = " << builtModel << std::endl;
+    if( builtModel ){
+      //print heap
+    }
+  }
+  Trace("sep-check") << "Sep::check(): " << e << " done, conflict=" << d_conflict.get() << endl;
 }
 
 
@@ -287,6 +299,26 @@ void TheorySep::conflict(TNode a, TNode b) {
   d_conflict = true;
 }
 
+
+TheorySep::HeapInfo::HeapInfo( context::Context* c ) : d_pos_assertions(c), d_neg_assertions(c) {
+
+}
+
+TheorySep::HeapInfo * TheorySep::getOrMakeHeapInfo( Node lbl, bool doMake ) {
+  std::map< Node, HeapInfo* >::iterator h_i = d_heap_info.find( lbl );
+  if( h_i==d_heap_info.end() ){
+    if( doMake ){
+      HeapInfo* hi = new HeapInfo( getSatContext() );
+      d_heap_info[lbl] = hi;
+      return hi;
+    }else{
+      return NULL;
+    }
+  }else{
+    return (*h_i).second;
+  }
+}
+
 Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
   std::map< int, Node >::iterator it = d_label_map[atom].find( child );
   if( it==d_label_map[atom].end() ){
@@ -296,10 +328,10 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
     }else{
       ss << lbl;
     }
-    ss << child;
-    Node lbl = NodeManager::currentNM()->mkSkolem( ss.str(), NodeManager::currentNM()->booleanType(), "", NodeManager::SKOLEM_EXACT_NAME );
-    d_label_map[atom][child] = lbl;
-    return lbl;
+    ss << "c" << child;
+    Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), NodeManager::currentNM()->booleanType(), "" );
+    d_label_map[atom][child] = n_lbl;
+    return n_lbl;
   }else{
     return (*it).second;
   }
@@ -333,6 +365,148 @@ Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) 
     }else{
       return it->second;
     }
+  }
+}
+
+
+bool TheorySep::checkHeap( Node lbl, std::map< Node, Node >& heap ) {
+  HeapInfo * hi = getOrMakeHeapInfo( lbl );
+  if( hi ){
+    if( Trace.isOn("sep-solve" ) ){
+      Trace("sep-solve") << "Label " << lbl << " has " << hi->d_pos_assertions.size() << " positive assertions : " << std::endl;
+      for( NodeList::const_iterator i = hi->d_pos_assertions.begin(); i != hi->d_pos_assertions.end(); ++i ) {
+        Trace("sep-solve") << "  " << *i << std::endl;
+      }
+    }
+    
+    bool firstTimeAtom = true;
+    for( NodeList::const_iterator ia = hi->d_pos_assertions.begin(); ia != hi->d_pos_assertions.end(); ++ia ) {
+      Node atom = (*ia);
+      std::map< Node, Node > heap_a;
+      if( atom.getKind()==kind::SEP_STAR ){
+        bool firstTime = true;
+        //construct heap for each child
+        for( std::map< int, Node >::iterator itl = d_label_map[atom].begin(); itl != d_label_map[atom].end(); ++itl ){
+          Trace("sep-solve-debug") << "  check child #" << itl->first << std::endl;
+          if( firstTime ){
+            if( !checkHeap( itl->second, heap_a ) ){
+              return false;
+            }else{
+              firstTime = false;
+            }
+          }else{
+            std::map< Node, Node > heap_c;
+            if( !checkHeap( itl->second, heap_c ) ){
+              return false;
+            }else{
+              //must be disjoint from all others so far
+              for( std::map< Node, Node >::iterator ith = heap_c.begin(); ith != heap_c.end(); ++ith ){
+                std::map< Node, Node >::iterator itha = heap_a.find( ith->first );
+                if( itha==heap_a.end() ){
+                  heap_a[ith->first] = ith->second;
+                }else{
+                  //conflict: found non-disjoint pointers over separation STAR
+                  std::vector< Node > conf;
+                  conf.push_back( ith->second );
+                  conf.push_back( itha->second );
+                  conf.push_back( ith->second[0].eqNode( itha->second[0] ) );
+                  sendLemma( conf, d_false, "NO_SEP" );
+                  return false;
+                }
+              }
+            }
+          }
+
+        }
+      }else if( atom.getKind()==kind::SEP_PTO ){
+        Node r1 = getRepresentative( atom[0] );
+        heap_a[r1] = atom;
+      }
+      if( firstTimeAtom ){
+        //copy to heap
+        for( std::map< Node, Node >::iterator it = heap_a.begin(); it != heap_a.end(); ++it ){
+          heap[it->first] = it->second;
+        }
+      }else{
+        //unify with existing heap
+        //TODO
+        return false;
+      }
+    }
+    return true;
+  }else{
+    Trace("sep-solve") << "Label " << lbl << " has no assertions." << std::endl;
+    //no constraints
+    return true;
+  }
+}
+
+void TheorySep::addAssertionToLabel( Node atom, bool polarity, Node lbl ) {
+  Trace("sep-solve") << "Add assertion " << atom << " to label " << lbl << ", pol = " << polarity << std::endl;
+  HeapInfo * hi = getOrMakeHeapInfo( lbl, true );
+  if( polarity ){
+    //TODO?
+    hi->d_pos_assertions.push_back( atom );
+  }else{
+    hi->d_neg_assertions.push_back( atom );
+  }
+}
+
+Node TheorySep::getRepresentative( Node t ) {
+  if( d_equalityEngine.hasTerm( t ) ){
+    return d_equalityEngine.getRepresentative( t );
+  }else{
+    return t;
+  }
+}
+
+bool TheorySep::hasTerm( Node a ){
+  return d_equalityEngine.hasTerm( a );
+}
+
+bool TheorySep::areEqual( Node a, Node b ){
+  if( a==b ){
+    return true;
+  }else if( hasTerm( a ) && hasTerm( b ) ){
+    return d_equalityEngine.areEqual( a, b );
+  }else{
+    return false;
+  }
+}
+
+bool TheorySep::areDisequal( Node a, Node b ){
+  if( a==b ){
+    return false;
+  }else if( hasTerm( a ) && hasTerm( b ) ){
+    if( d_equalityEngine.areDisequal( a, b, false ) ){
+      return true;
+    }
+  } 
+  return false;
+}
+
+void TheorySep::sendLemma( std::vector< Node >& ant, Node conc, const char * c ) {
+  std::vector< TNode > ant_e;
+  for( unsigned i=0; i<ant.size(); i++ ){
+    Trace("sep-lemma-debug") << "Explain : " << ant[i] << std::endl;
+    explain( ant[i], ant_e );
+  }
+  Node ant_n;
+  if( ant_e.empty() ){
+    ant_n = d_true;
+  }else if( ant_e.size()==1 ){
+    ant_n = ant_e[0];
+  }else{
+    ant_n = NodeManager::currentNM()->mkNode( kind::AND, ant_e );
+  }
+  if( conc==d_false ){
+    Trace("sep-lemma") << "Sep::Conflict: " << ant_n << " by " << c << std::endl;
+    d_out->conflict( ant_n );
+    d_conflict = true;
+  }else{
+    Node lem = NodeManager::currentNM()->mkNode( kind::IMPLIES, ant_n, conc );
+    Trace("sep-lemma") << "Sep::Lemma: " << lem << " by " << c << std::endl;
+    d_out->lemma( lem );
   }
 }
 

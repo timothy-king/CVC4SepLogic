@@ -23,7 +23,11 @@ using namespace std;
 namespace CVC4 {
 
 std::ostream& operator<<(std::ostream& out, const NilRef& asa) {
-  return out << "nil(" << asa.getType() << ')';
+  return out << "(nil " << asa.getType() << ")";
+}
+
+std::ostream& operator<<(std::ostream& out, const EmpStar& asa) {
+  return out << "emp";
 }
 
 }/* CVC4 namespace */

@@ -25,6 +25,22 @@ namespace CVC4 {
 namespace theory {
 namespace sep {
 
+class NilRefTypeRule {
+public:
+  inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
+    throw (TypeCheckingExceptionPrivate, AssertionException) {
+    return TypeNode::fromType( n.getConst<NilRef>().getType() );
+  }
+};
+  
+class EmpStarTypeRule {
+public:
+  inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
+    throw (TypeCheckingExceptionPrivate, AssertionException) {
+    return nodeManager->booleanType();
+  }
+};
+  
 struct SepPtoTypeRule {
   inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
     throw (TypeCheckingExceptionPrivate, AssertionException) {

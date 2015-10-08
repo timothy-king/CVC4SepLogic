@@ -22,14 +22,20 @@ namespace CVC4 {
 namespace theory {
 namespace sep {
   
-void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& children ){
-  if( n.getKind()==kind::SEP_STAR ){
+void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& children, std::vector< Node >& s_children, std::vector< Node >& ns_children ){
+  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::AND ){
     for( unsigned i=0; i<n.getNumChildren(); i++ ){
-      getStarChildren( n[i], children );
+      getStarChildren( n[i], children, s_children, ns_children );
     }
   }else{
     if( std::find( children.begin(), children.end(), n )==children.end() ){
       children.push_back( n );
+      std::map< Node, bool > visited;
+      if( isSpatial( n, visited ) ){
+        s_children.push_back( n );
+      }else{
+        ns_children.push_back( n );
+      }
     }
   }
 }
@@ -60,14 +66,22 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
     case kind::SEP_STAR: {
       //flatten
       std::vector< Node > children;
-      getStarChildren( node, children );
-      if( children.size()==0 ){
-        //TODO
-        retNode = node;
-      }else if( children.size()==1) {
-        retNode = children[0];
+      std::vector< Node > s_children;
+      std::vector< Node > ns_children;
+      getStarChildren( node, children, s_children, ns_children );
+      Node schild;
+      if( s_children.size()==0 ){
+        schild = NodeManager::currentNM()->mkConst( EmpStar() );
+      }else if( s_children.size()==1) {
+        schild = s_children[0];
       }else{
-        retNode = NodeManager::currentNM()->mkNode( kind::SEP_STAR, children );
+        schild = NodeManager::currentNM()->mkNode( kind::SEP_STAR, s_children );
+      }
+      ns_children.push_back( schild );
+      if( ns_children.size()==1 ){
+        retNode = ns_children[0];
+      }else{
+        retNode = NodeManager::currentNM()->mkNode( kind::AND, ns_children );
       }
       break;
     }
