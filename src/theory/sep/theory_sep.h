@@ -171,12 +171,12 @@ class TheorySep : public Theory {
 
   /** Are we in conflict? */
   context::CDO<bool> d_conflict;
+  std::vector< Node > d_pending_exp;
+  std::vector< Node > d_pending;
+  std::vector< int > d_pending_lem;
 
   /** Conflict when merging constants */
   void conflict(TNode a, TNode b);
-
-  /** The conflict node */
-  Node d_conflictNode;
 
   //cache for positive polarity start reduction
   NodeSet d_star_pos_reduce;
@@ -198,14 +198,22 @@ class TheorySep : public Theory {
   
   void addAssertionToLabel( Node atom, bool polarity, Node lbl );
   
-  bool checkHeap( Node lbl, std::map< Node, Node >& heap );
+  class HeapCons {
+  public:
+    Node d_val;
+    Node d_exp;
+  };
+  
+  bool checkHeap( Node lbl, std::map< Node, HeapCons >& heap );
+  void debugPrintHeap( std::map< Node, HeapCons >& heap, const char * c );
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );
   bool areEqual( Node a, Node b );
   bool areDisequal( Node a, Node b );
   
-  void sendLemma( std::vector< Node >& ant, Node conc, const char * c );
+  void sendLemma( std::vector< Node >& ant, Node conc, const char * c, bool infer = false );
+  void doPendingFacts();
 public:
   eq::EqualityEngine* getEqualityEngine() {
     return &d_equalityEngine;
