@@ -22,18 +22,59 @@ namespace CVC4 {
 namespace theory {
 namespace sep {
   
-void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& children, std::vector< Node >& s_children, std::vector< Node >& ns_children ){
-  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::AND ){
+void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& s_children, std::vector< Node >& ns_children ){
+  Assert( n.getKind()==kind::SEP_STAR );
+  for( unsigned i=0; i<n.getNumChildren(); i++ ){
+    if( n[i].getKind()==kind::EMP_STAR ){
+      //do nothing
+    }else if( n[i].getKind()==kind::SEP_STAR ){
+      getStarChildren( n[i], s_children, ns_children );
+    }else if( n[i].getKind()==kind::SEP_PTO ){
+      s_children.push_back( n[i] );
+    }else{
+      std::vector< Node > temp_s_children;
+      getAndChildren( n[i], temp_s_children, ns_children );
+      Node to_add;
+      if( temp_s_children.size()==0 ){
+        to_add = NodeManager::currentNM()->mkConst( true );
+      }else{
+        //remove empty star
+        Node es = NodeManager::currentNM()->mkConst( EmpStar() );
+        std::vector< Node >::iterator it = std::find( temp_s_children.begin(), temp_s_children.end(), es );
+        if( it!=temp_s_children.end() ){
+          temp_s_children.erase( it, it+1 );
+        }
+        if( temp_s_children.size()==1 ){
+          to_add = temp_s_children[0];
+        }else if( temp_s_children.size()>1 ){
+          to_add = NodeManager::currentNM()->mkNode( kind::AND, temp_s_children );
+        }
+      }
+      if( !to_add.isNull() ){
+        //flatten star
+        if( to_add.getKind()==kind::SEP_STAR ){
+          getStarChildren( to_add, s_children, ns_children );
+        }else if( std::find( s_children.begin(), s_children.end(), to_add )==s_children.end() ){
+          s_children.push_back( to_add );
+        }
+      }
+    }
+  }
+}
+
+void TheorySepRewriter::getAndChildren( Node n, std::vector< Node >& s_children, std::vector< Node >& ns_children ) {
+  if( n.getKind()==kind::AND ){
     for( unsigned i=0; i<n.getNumChildren(); i++ ){
-      getStarChildren( n[i], children, s_children, ns_children );
+      getAndChildren( n[i], s_children, ns_children );
     }
   }else{
-    if( std::find( children.begin(), children.end(), n )==children.end() ){
-      children.push_back( n );
-      std::map< Node, bool > visited;
-      if( isSpatial( n, visited ) ){
+    std::map< Node, bool > visited;
+    if( isSpatial( n, visited ) ){
+      if( std::find( s_children.begin(), s_children.end(), n )==s_children.end() ){
         s_children.push_back( n );
-      }else{
+      }
+    }else{
+      if( std::find( ns_children.begin(), ns_children.end(), n )==ns_children.end() ){
         ns_children.push_back( n );
       }
     }
@@ -43,7 +84,7 @@ void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& children, 
 bool TheorySepRewriter::isSpatial( Node n, std::map< Node, bool >& visited ) {
   if( visited.find( n )==visited.end() ){
     visited[n] = true;
-    if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_PTO || n.getKind()==kind::SEP_LABEL ){
+    if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_PTO || n.getKind()==kind::EMP_STAR || n.getKind()==kind::SEP_LABEL ){
       return true;
     }else if( n.getType().isBoolean() ){
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
@@ -65,10 +106,9 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
     }
     case kind::SEP_STAR: {
       //flatten
-      std::vector< Node > children;
       std::vector< Node > s_children;
       std::vector< Node > ns_children;
-      getStarChildren( node, children, s_children, ns_children );
+      getStarChildren( node, s_children, ns_children );
       Node schild;
       if( s_children.size()==0 ){
         schild = NodeManager::currentNM()->mkConst( EmpStar() );
