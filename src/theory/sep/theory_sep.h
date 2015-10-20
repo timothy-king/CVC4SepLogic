@@ -180,32 +180,48 @@ class TheorySep : public Theory {
 
   //cache for positive polarity start reduction
   NodeSet d_star_pos_reduce;
+  /** inferences: maintained to ensure ref count for internally introduced nodes */
+  NodeList d_infer;
+  NodeList d_infer_exp;
+  
   
   std::map< Node, std::map< int, Node > > d_label_map;
   
-  class HeapInfo {
+  class HeapAssertInfo {
   public:
-    HeapInfo( context::Context* c );
-    ~HeapInfo(){}
+    HeapAssertInfo( context::Context* c );
+    ~HeapAssertInfo(){}
     NodeList d_pos_assertions;
     NodeList d_neg_assertions;
   };
-  std::map< Node, HeapInfo * > d_heap_info;
-  HeapInfo * getOrMakeHeapInfo( Node n, bool doMake = false );
+  std::map< Node, HeapAssertInfo * > d_heap_info;
+  HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
   
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   
   void addAssertionToLabel( Node atom, bool polarity, Node lbl );
   
-  class HeapCons {
+  class HeapLoc {
   public:
+    //value for this location
     Node d_val;
+    //explanation
     Node d_exp;
+    //labelled explanation
+    Node d_lexp;
+  };
+  class HeapInfo {
+  public:
+    HeapInfo() : d_strict( false ) {}
+    std::map< Node, HeapLoc > d_heap;
+    bool d_strict;
+    //in the case it is a strict heap, d_exp explains why this heap is exactly this
+    std::vector< Node > d_strict_exp;
   };
   
-  bool checkHeap( Node lbl, std::map< Node, HeapCons >& heap );
-  void debugPrintHeap( std::map< Node, HeapCons >& heap, const char * c );
+  bool checkHeap( Node lbl, HeapInfo& heap );
+  void debugPrintHeap( HeapInfo& heap, const char * c );
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );

@@ -21,9 +21,11 @@ MAKEFLAGS = -k
 TESTS =	\
   pto-01.smt2 \
   pto-02.smt2 \
+  pto-04.smt2 \
   sep-01.smt2 \
   sep-02.smt2 \
-  sep-03.smt2
+  sep-03.smt2 \
+  sep-find2.smt2
 
 
 FAILING_TESTS =
