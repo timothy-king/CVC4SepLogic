@@ -268,6 +268,7 @@ void TheorySep::check(Effort e) {
             //reductions for children of star
             if( s_atom.getKind()==kind::SEP_STAR ){
               std::vector< Node > children;
+              std::vector< Node > labels;
               for( unsigned i=0; i<s_atom.getNumChildren(); i++ ){
                 Node lblc = getLabel( s_atom, i, s_lbl );
                 Assert( !lblc.isNull() );
@@ -275,14 +276,19 @@ void TheorySep::check(Effort e) {
                 Node lc = applyLabel( s_atom[i], lblc, visited );
                 Assert( !lc.isNull() );
                 children.push_back( lc );
+                labels.push_back( lblc );
               }
               Node conc = children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children );
               Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
               Trace("sep-lemma") << "Sep::Lemma : star reduction : " << lem << std::endl;
               d_out->lemma( lem );
+              //reduction for heap : pairwise disjoint, union
+              
+            }else if( s_atom.getKind()==kind::SEP_PTO ){
+              
+            }else if( s_atom.getKind()==kind::EMP_STAR ){
+              
             }
-            //reductions for heap
-            //TODO
           }
         }else{
           Notice() << "Negated STAR asserted to sep theory: " << fact << std::endl;
@@ -297,6 +303,8 @@ void TheorySep::check(Effort e) {
           d_equalityEngine.assertPredicate(s_atom, polarity, fact);
         }
         Debug("sep") << "Done asserting " << atom << " to EE." << std::endl;
+        //maybe propagate
+        doPendingFacts();
       }
       if( is_spatial ){
         addAssertionToLabel( s_atom, polarity, s_lbl );
@@ -373,6 +381,25 @@ TheorySep::HeapAssertInfo * TheorySep::getOrMakeHeapAssertInfo( Node lbl, bool d
     }
   }else{
     return (*h_i).second;
+  }
+}
+
+TheorySep::EqcInfo::EqcInfo( context::Context* c ) : d_pto(c) {
+
+}
+
+TheorySep::EqcInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
+  std::map< Node, EqcInfo* >::iterator e_i = d_eqc_info.find( n );
+  if( e_i==d_eqc_info.end() ){
+    if( doMake ){
+      EqcInfo* ei = new EqcInfo( getSatContext() );
+      d_eqc_info[n] = ei;
+      return ei;
+    }else{
+      return NULL;
+    }
+  }else{
+    return (*e_i).second;
   }
 }
 
@@ -653,6 +680,16 @@ void TheorySep::addAssertionToLabel( Node atom, bool polarity, Node lbl ) {
   if( polarity ){
     //propagate equalities for PTO
     if( atom.getKind()==kind::SEP_PTO ){
+      //associate the equivalence class of the lhs with this pto
+      Node r = getRepresentative( atom[0] );
+      EqcInfo * ei = getOrMakeEqcInfo( r, true );
+      if( !ei->d_pto.get().isNull() ){
+        mergePto( ei->d_pto.get(), atom );
+      }else{
+        ei->d_pto.set( atom );
+      }
+      
+      //also do LHS propagation
       std::vector< Node > exp;
       exp.push_back( atom );
       bool addedLemma = false;
@@ -660,9 +697,10 @@ void TheorySep::addAssertionToLabel( Node atom, bool polarity, Node lbl ) {
         Node n = (*ia);
         if( n.getKind()==kind::SEP_PTO ){
           exp.push_back( n );
-          for( unsigned i=0; i<2; i++ ){
+          //should only need to propagate the LHS
+          for( unsigned i=0; i<1; i++ ){
             if( !areEqual( n[i], atom[i] ) ){
-              sendLemma( exp, n[i].eqNode( atom[i] ), "PTO_PROP", true );
+              sendLemma( exp, n[i].eqNode( atom[i] ), "PTO_LHS_PROP", true );
               addedLemma = true;
             }
           }
@@ -712,6 +750,29 @@ bool TheorySep::areDisequal( Node a, Node b ){
     }
   } 
   return false;
+}
+
+void TheorySep::eqNotifyPreMerge(TNode t1, TNode t2) {
+  EqcInfo * e2 = getOrMakeEqcInfo( t2, false );
+  if( e2 && !e2->d_pto.get().isNull() ){
+    EqcInfo * e1 = getOrMakeEqcInfo( t1, true );
+    if( !e1->d_pto.get().isNull() ){
+      mergePto( e1->d_pto.get(), e2->d_pto.get() );
+    }else{
+      e1->d_pto.set( e2->d_pto.get() );
+    }
+  }
+}
+
+void TheorySep::mergePto( Node p1, Node p2 ) {
+  Trace("sep-lemma-debug") << "Merge pto : " << p1 << " " << p2 << std::endl;
+  Assert( p1.getKind()==kind::SEP_PTO && p2.getKind()==kind::SEP_PTO );
+  std::vector< Node > exp;
+  exp.push_back( p1 );
+  exp.push_back( p2 );
+  if( !areEqual( p1[1], p2[1] ) ){
+    sendLemma( exp, p1[1].eqNode( p2[1] ), "PTO_RHS_PROP", true );
+  }
 }
 
 void TheorySep::sendLemma( std::vector< Node >& ant, Node conc, const char * c, bool infer ) {

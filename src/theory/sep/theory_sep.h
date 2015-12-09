@@ -158,7 +158,7 @@ class TheorySep : public Theory {
     }
 
     void eqNotifyNewClass(TNode t) { }
-    void eqNotifyPreMerge(TNode t1, TNode t2) { }
+    void eqNotifyPreMerge(TNode t1, TNode t2) { d_sep.eqNotifyPreMerge( t1, t2 ); }
     void eqNotifyPostMerge(TNode t1, TNode t2) { }
     void eqNotifyDisequal(TNode t1, TNode t2, TNode reason) { }
   };
@@ -198,6 +198,15 @@ class TheorySep : public Theory {
   std::map< Node, HeapAssertInfo * > d_heap_info;
   HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
   
+  class EqcInfo {
+  public:
+    EqcInfo( context::Context* c );
+    ~EqcInfo(){}
+    context::CDO< Node > d_pto;
+  };
+  std::map< Node, EqcInfo * > d_eqc_info;
+  EqcInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
+  
   //calculate the element type of the heap for spatial assertions
   TypeNode getReferenceType( Node atom );
   TypeNode getReferenceType2( Node n, std::map< Node, bool >& visited );
@@ -228,11 +237,14 @@ class TheorySep : public Theory {
   
   bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
+  void mergePto( Node p1, Node p2 );
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );
   bool areEqual( Node a, Node b );
-  bool areDisequal( Node a, Node b );
+  bool areDisequal( Node a, Node b );  
+  /** called when two equivalence classes will merge */
+  void eqNotifyPreMerge(TNode t1, TNode t2);
   
   void sendLemma( std::vector< Node >& ant, Node conc, const char * c, bool infer = false );
   void doPendingFacts();
