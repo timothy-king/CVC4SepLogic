@@ -21,7 +21,7 @@
 namespace CVC4 {
 namespace theory {
 namespace sep {
-  
+
 void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& s_children, std::vector< Node >& ns_children ){
   Assert( n.getKind()==kind::SEP_STAR );
   for( unsigned i=0; i<n.getNumChildren(); i++ ){
@@ -96,11 +96,19 @@ bool TheorySepRewriter::isSpatial( Node n, std::map< Node, bool >& visited ) {
   }
   return false;
 }
-  
+
 RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
   Trace("sep-postrewrite") << "Sep::postRewrite start " << node << std::endl;
   Node retNode = node;
   switch (node.getKind()) {
+    case kind::SEP_LABEL: {
+      if( node[0].getKind()==kind::SEP_PTO ){
+        node[1].eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, node[0][0] ) );
+      }else if( node[0].getKind()==kind::EMP_STAR ){
+        node[1].eqNode( NodeManager::currentNM()->mkConst(EmptySet(node[1].getType().toType())) );
+      }
+      break;
+    }
     case kind::SEP_PTO: {
       break;
     }

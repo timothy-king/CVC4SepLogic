@@ -39,7 +39,8 @@ TheorySep::TheorySep(context::Context* c, context::UserContext* u, OutputChannel
   d_conflict(c, false),
   d_reduce(u),
   d_infer(c),
-  d_infer_exp(c)
+  d_infer_exp(c),
+  d_spatial_assertions(c)
 {
   d_true = NodeManager::currentNM()->mkConst<bool>(true);
   d_false = NodeManager::currentNM()->mkConst<bool>(false);
@@ -227,7 +228,7 @@ void TheorySep::check(Effort e) {
   if (done() && !fullEffort(e)) {
     return;
   }
-  
+
   getOutputChannel().spendResource(options::theoryCheckStep());
 
   TimerStat::CodeTimer checkTimer(d_checkTime);
@@ -261,9 +262,9 @@ void TheorySep::check(Effort e) {
     }else{
       //do reductions
       if( is_spatial ){
-          if( d_reduce.find( atom )==d_reduce.end() ){
-          Trace("sep-lemma-debug") << "Reducing assertion " << atom << std::endl;
-          d_reduce.insert( atom );
+          if( d_reduce.find( fact )==d_reduce.end() ){
+          Trace("sep-lemma-debug") << "Reducing assertion " << fact << std::endl;
+          d_reduce.insert( fact );
           Node conc;
           std::map< Node, Node >::iterator its = d_red_conc[s_lbl].find( s_atom );
           if( its==d_red_conc[s_lbl].end() ){
@@ -293,9 +294,9 @@ void TheorySep::check(Effort e) {
               }
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
-              conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );              
+              conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );
             }else if( s_atom.getKind()==kind::EMP_STAR ){
-              conc = s_lbl.eqNode( NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType())) );            
+              conc = s_lbl.eqNode( NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType())) );
             }
             d_red_conc[s_lbl][s_atom] = conc;
           }else{
@@ -306,6 +307,7 @@ void TheorySep::check(Effort e) {
             Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
             d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
             d_neg_guard[s_lbl][s_atom] = getValuation().ensureLiteral( d_neg_guard[s_lbl][s_atom] );
+            Trace("sep-lemma-debug") << "Neg guard : " << s_lbl << " " << s_atom << " " << d_neg_guard[s_lbl][s_atom] << std::endl;
             AlwaysAssert( !d_neg_guard[s_lbl][s_atom].isNull() );
             d_out->requirePhase( d_neg_guard[s_lbl][s_atom], true );
             Node lem = NodeManager::currentNM()->mkNode( kind::OR, d_neg_guard[s_lbl][s_atom].negate(), conc );
@@ -320,12 +322,12 @@ void TheorySep::check(Effort e) {
         }
       }
       //assert to equality engine
-      if( s_atom.getKind()!=kind::SEP_STAR ){
+      if( s_atom.getKind()!=kind::SEP_STAR && ( !is_spatial || polarity ) ){
         Trace("sep-assert") << "Asserting " << atom << " to EE..." << std::endl;
-        if( atom.getKind()==kind::EQUAL ){
-          d_equalityEngine.assertEquality(atom, polarity, fact);
+        if( s_atom.getKind()==kind::EQUAL ){
+          d_equalityEngine.assertEquality(s_atom, polarity, fact);
         }else{
-          d_equalityEngine.assertPredicate(atom, polarity, fact);
+          d_equalityEngine.assertPredicate(s_atom, polarity, fact);
         }
         Trace("sep-assert") << "Done asserting " << atom << " to EE." << std::endl;
         //maybe propagate
@@ -333,6 +335,7 @@ void TheorySep::check(Effort e) {
       }
       if( is_spatial ){
         addAssertionToLabel( s_atom, polarity, s_lbl );
+        d_spatial_assertions.push_back( fact );
         //maybe propagate
         doPendingFacts();
       }
@@ -340,6 +343,27 @@ void TheorySep::check(Effort e) {
   }
 
   if( e == EFFORT_FULL && !d_conflict && !d_valuation.needCheck() ){
+    //build positive/negative assertion lists for labels
+    for( std::map< Node, HeapAssertInfo * >::iterator it = d_heap_info.begin(); it != d_heap_info.end(); ++it ){
+      it->second->d_pos_assertions.clear();
+      it->second->d_neg_assertions.clear();
+    }
+    for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
+      Node fact = (*i);
+      bool polarity = fact.getKind() != kind::NOT;
+      TNode atom = polarity ? fact : fact[0];
+      Assert( atom.getKind()==kind::SEP_LABEL );
+      TNode s_atom = atom[0];
+      TNode s_lbl = atom[1];
+      HeapAssertInfo * hi = getOrMakeHeapAssertInfo( s_lbl, true );
+      //hi->d_pos_assertions.push_back( s_atom );
+      if( polarity ){
+        hi->d_pos_assertions.push_back( s_atom );
+      }else{
+        hi->d_neg_assertions.push_back( s_atom );
+      }
+    }
+
     Assert( d_pending.empty() );
     //bool needsCheck = true;
     bool needsCheck = options::sepCheckHeap();
@@ -391,7 +415,7 @@ void TheorySep::conflict(TNode a, TNode b) {
 }
 
 
-TheorySep::HeapAssertInfo::HeapAssertInfo( context::Context* c ) : d_pos_assertions(c), d_neg_assertions(c) {
+TheorySep::HeapAssertInfo::HeapAssertInfo( context::Context* c ) : d_pto(c) {
 
 }
 
@@ -481,7 +505,7 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
       ss << lbl;
     }
     ss << "c" << child;
-    TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(refType));    
+    TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(refType));
     Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_label_map[atom][child] = n_lbl;
     return n_lbl;
@@ -540,15 +564,19 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
   if( hi ){
     if( Trace.isOn("sep-solve" ) ){
       Trace("sep-solve") << "Label " << lbl << " has " << hi->d_pos_assertions.size() << " positive assertions : " << std::endl;
-      for( NodeList::const_iterator i = hi->d_pos_assertions.begin(); i != hi->d_pos_assertions.end(); ++i ) {
-        Trace("sep-solve") << "  " << *i << std::endl;
+      for( unsigned i = 0; i < hi->d_pos_assertions.size(); ++i ) {
+        Trace("sep-solve") << "  " << hi->d_pos_assertions[i] << std::endl;
       }
     }
-    
+
     Node firstTimeAtom;
-    for( NodeList::const_iterator ia = hi->d_pos_assertions.begin(); ia != hi->d_pos_assertions.end(); ++ia ) {
-      Node atom = (*ia);
+    for( unsigned ia = 0; ia<hi->d_pos_assertions.size(); ++ia ) {
+      Node atom = hi->d_pos_assertions[ia];
       Trace("sep-solve-debug") << "  check atom " << atom << std::endl;
+      bool is_neg = std::find( hi->d_neg_assertions.begin(), hi->d_neg_assertions.end(), atom )!=hi->d_neg_assertions.end();
+      if( is_neg ){
+        Trace("sep-solve-debug") << "  ...is negated." << std::endl;
+      }
       Assert( atom.getKind()!=kind::SEP_LABEL );
       HeapInfo heap_a;
       if( atom.getKind()==kind::SEP_STAR ){
@@ -618,7 +646,7 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
       }else if( atom.getKind()==kind::EMP_STAR ){
         heap_a.d_strict = true;
       }
-      
+
       if( firstTimeAtom.isNull() ){
         Trace("sep-solve-debug") << "  copy to heap..." << std::endl;
         //copy to heap
@@ -637,7 +665,7 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
           to_process[0][it->first] = true;
         }
         Trace("sep-solve-debug") << "  unify with heap..." << std::endl;
-          
+
         //unify with existing heap
         //first, check common indices
         for( std::map< Node, HeapLoc >::iterator ita = heap_a.d_heap.begin(); ita != heap_a.d_heap.end(); ++ita ){
@@ -663,7 +691,7 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
           }
         }
         Trace("sep-solve-debug") << "  done, to_process : " << to_process[0].size() << " " << to_process[1].size() << "..." << std::endl;
-        
+
         if( !to_process[0].empty() || !to_process[1].empty() ){
           //heaps have different cardinalities
           Trace("sep-solve") << "Must unify heaps for " << std::endl;
@@ -700,7 +728,7 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
               heap.d_heap[ita->first].d_lexp = heap_a.d_heap[ita->first].d_lexp;
             }
           }
-          heap.d_strict = heap.d_strict || heap_a.d_strict;          
+          heap.d_strict = heap.d_strict || heap_a.d_strict;
         }
         //Notice() << "Cannot unify heaps (different cardinalities)." << std::endl;
         //d_out->setIncomplete();
@@ -710,13 +738,13 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
     if( Trace.isOn("sep-solve" ) ){
       if( !hi->d_neg_assertions.empty() ){
         Trace("sep-solve") << "Label " << lbl << " has " << hi->d_neg_assertions.size() << " negative assertions : " << std::endl;
-        for( NodeList::const_iterator i = hi->d_neg_assertions.begin(); i != hi->d_neg_assertions.end(); ++i ) {
-          Trace("sep-solve") << "  " << *i << std::endl;
+        for( unsigned i = 0; i < hi->d_neg_assertions.size(); ++i ) {
+          Trace("sep-solve") << "  " << hi->d_neg_assertions[i] << std::endl;
         }
       }
     }
-    for( NodeList::const_iterator ia = hi->d_neg_assertions.begin(); ia != hi->d_neg_assertions.end(); ++ia ) {
-      Node atom = (*ia);
+    for( unsigned ia = 0; ia < hi->d_neg_assertions.size(); ++ia ) {
+      Node atom = hi->d_neg_assertions[ia];
       Assert( d_neg_guard[lbl].find( atom )!=d_neg_guard[lbl].end() );
       //check if the guard is asserted positively
       Node guard = d_neg_guard[lbl][atom];
@@ -727,6 +755,10 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
       }
       if( active ){
         Trace("sep-solve") << "--> Active negated atom : " << atom << std::endl;
+        //add lemma
+        Trace("sep-solve-neg") << "Heap is : " << std::endl;
+        debugPrintHeap( heap, "sep-solve-neg" );
+        Trace("sep-solve-neg") << std::endl;
       }
     }
     return true;
@@ -739,46 +771,24 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
 
 void TheorySep::addAssertionToLabel( Node atom, bool polarity, Node lbl ) {
   Trace("sep-solve") << "Add assertion " << atom << " to label " << lbl << ", pol = " << polarity << std::endl;
-  HeapAssertInfo * hi = getOrMakeHeapAssertInfo( lbl, true );
-  if( polarity ){
-    //propagate equalities for PTO
-    if( atom.getKind()==kind::SEP_PTO ){
-      //associate the equivalence class of the lhs with this pto
-      Node r = getRepresentative( atom[0] );
-      EqcInfo * ei = getOrMakeEqcInfo( r, true );
-      if( !ei->d_pto.get().isNull() ){
-        mergePto( ei->d_pto.get(), atom );
-      }else{
-        ei->d_pto.set( atom );
-      }
-      
-      //also do LHS propagation
-      std::vector< Node > exp;
-      exp.push_back( atom );
-      bool addedLemma = false;
-      for( NodeList::const_iterator ia = hi->d_pos_assertions.begin(); ia != hi->d_pos_assertions.end(); ++ia ){
-        Node n = (*ia);
-        if( n.getKind()==kind::SEP_PTO ){
-          exp.push_back( n );
-          //should only need to propagate the LHS
-          for( unsigned i=0; i<1; i++ ){
-            if( !areEqual( n[i], atom[i] ) ){
-              sendLemma( exp, n[i].eqNode( atom[i] ), "PTO_LHS_PROP", true );
-              addedLemma = true;
-            }
-          }
-          exp.pop_back();
-          if( addedLemma ){
-            //will be equal to others by transitivity
-            break;
-          }
-        }
-      }
+  if( polarity && atom.getKind()==kind::SEP_PTO ){
+    //associate the equivalence class of the lhs with this pto
+    Node r = getRepresentative( atom[0] );
+    EqcInfo * ei = getOrMakeEqcInfo( r, true );
+    if( !ei->d_pto.get().isNull() ){
+      mergePto( ei->d_pto.get(), atom, 1 );
+    }else{
+      ei->d_pto.set( atom );
     }
-    hi->d_pos_assertions.push_back( atom );
-  }else{
-    hi->d_neg_assertions.push_back( atom );
+    //associate the label with this pto
+    HeapAssertInfo * hi = getOrMakeHeapAssertInfo( lbl, true );
+    if( !hi->d_pto.get().isNull() ){
+      mergePto( hi->d_pto.get(), atom, 0 );
+    }else{
+      hi->d_pto.set( atom );
+    }
   }
+
 }
 
 Node TheorySep::getRepresentative( Node t ) {
@@ -810,7 +820,7 @@ bool TheorySep::areDisequal( Node a, Node b ){
     if( d_equalityEngine.areDisequal( a, b, false ) ){
       return true;
     }
-  } 
+  }
   return false;
 }
 
@@ -819,21 +829,21 @@ void TheorySep::eqNotifyPreMerge(TNode t1, TNode t2) {
   if( e2 && !e2->d_pto.get().isNull() ){
     EqcInfo * e1 = getOrMakeEqcInfo( t1, true );
     if( !e1->d_pto.get().isNull() ){
-      mergePto( e1->d_pto.get(), e2->d_pto.get() );
+      mergePto( e1->d_pto.get(), e2->d_pto.get(), 1 );
     }else{
       e1->d_pto.set( e2->d_pto.get() );
     }
   }
 }
 
-void TheorySep::mergePto( Node p1, Node p2 ) {
-  Trace("sep-lemma-debug") << "Merge pto : " << p1 << " " << p2 << std::endl;
+void TheorySep::mergePto( Node p1, Node p2, int index ) {
+  Trace("sep-lemma-debug") << "Merge pto : " << p1 << " " << p2 << ", index = " << index << std::endl;
   Assert( p1.getKind()==kind::SEP_PTO && p2.getKind()==kind::SEP_PTO );
   std::vector< Node > exp;
   exp.push_back( p1 );
   exp.push_back( p2 );
-  if( !areEqual( p1[1], p2[1] ) ){
-    sendLemma( exp, p1[1].eqNode( p2[1] ), "PTO_RHS_PROP", true );
+  if( !areEqual( p1[index], p2[index] ) ){
+    sendLemma( exp, p1[index].eqNode( p2[index] ), "PTO_PROP", true );
   }
 }
 

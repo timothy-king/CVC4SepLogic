@@ -49,7 +49,7 @@ class TheorySep : public Theory {
   Node d_false;
 
   Node mkAnd( std::vector< TNode >& assumptions );
-  
+
   public:
 
   TheorySep(context::Context* c, context::UserContext* u, OutputChannel& out, Valuation valuation, const LogicInfo& logicInfo);
@@ -79,7 +79,7 @@ class TheorySep : public Theory {
 
   /** Explain why this literal is true by adding assumptions */
   void explain(TNode literal, std::vector<TNode>& assumptions);
-  
+
   public:
 
   void preRegisterTerm(TNode n);
@@ -185,21 +185,22 @@ class TheorySep : public Theory {
   /** inferences: maintained to ensure ref count for internally introduced nodes */
   NodeList d_infer;
   NodeList d_infer_exp;
-  
-  
+  NodeList d_spatial_assertions;
+
   std::map< TypeNode, Node > d_base_label;
   std::map< Node, std::map< int, Node > > d_label_map;
-  
+
   class HeapAssertInfo {
   public:
     HeapAssertInfo( context::Context* c );
     ~HeapAssertInfo(){}
-    NodeList d_pos_assertions;
-    NodeList d_neg_assertions;
+    context::CDO< Node > d_pto;
+    std::vector< Node > d_pos_assertions;
+    std::vector< Node > d_neg_assertions;
   };
   std::map< Node, HeapAssertInfo * > d_heap_info;
   HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
-  
+
   class EqcInfo {
   public:
     EqcInfo( context::Context* c );
@@ -208,7 +209,7 @@ class TheorySep : public Theory {
   };
   std::map< Node, EqcInfo * > d_eqc_info;
   EqcInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
-  
+
   //calculate the element type of the heap for spatial assertions
   TypeNode getReferenceType( Node atom );
   TypeNode getReferenceType2( Node n, std::map< Node, bool >& visited );
@@ -217,9 +218,9 @@ class TheorySep : public Theory {
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   void getStarChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels );
-  
+
   void addAssertionToLabel( Node atom, bool polarity, Node lbl );
-  
+
   class HeapLoc {
   public:
     //value for this location
@@ -237,18 +238,18 @@ class TheorySep : public Theory {
     //in the case it is a strict heap, d_exp explains why this heap is exactly this
     std::vector< Node > d_strict_exp;
   };
-  
+
   bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
-  void mergePto( Node p1, Node p2 );
+  void mergePto( Node p1, Node p2, int index );
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );
   bool areEqual( Node a, Node b );
-  bool areDisequal( Node a, Node b );  
+  bool areDisequal( Node a, Node b );
   /** called when two equivalence classes will merge */
   void eqNotifyPreMerge(TNode t1, TNode t2);
-  
+
   void sendLemma( std::vector< Node >& ant, Node conc, const char * c, bool infer = false );
   void doPendingFacts();
 public:
