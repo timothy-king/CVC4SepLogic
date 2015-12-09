@@ -214,6 +214,7 @@ class TheorySep : public Theory {
   Node getBaseLabel( TypeNode tn );
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
+  void getStarChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels );
   
   void addAssertionToLabel( Node atom, bool polarity, Node lbl );
   

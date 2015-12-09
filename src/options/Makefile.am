@@ -107,7 +107,9 @@ nodist_liboptions_la_SOURCES = \
 	../theory/sets/options.cpp \
 	../theory/sets/options.h \
 	../theory/fp/options.cpp \
-	../theory/fp/options.h
+	../theory/fp/options.h \
+	../theory/sep/options.cpp \
+	../theory/sep/options.h
 
 BUILT_SOURCES = \
 	exprs-builts \

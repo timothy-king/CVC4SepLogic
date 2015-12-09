@@ -258,10 +258,17 @@ void TheorySep::check(Effort e) {
       if( is_spatial ){
         if( !polarity ){
           // introduce guard, assert positive version
-          //TODO
-        }
-        
-        if( polarity ){
+          if( s_atom.getKind()==kind::SEP_STAR ){
+            Trace("sep-lemma-debug") << "Negated STAR asserted to sep theory: " << fact << std::endl;
+            //TODO
+            /*
+            Node guard = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
+            guard = getValuation().ensureLiteral( guard );
+            AlwaysAssert( !guard.isNull() );
+            d_out->requirePhase( guard, true );
+            */
+          }
+        }else{
           if( d_reduce.find( atom )==d_reduce.end() ){
             Trace("sep-lemma-debug") << "Reducing positive assertion " << atom << std::endl;
             d_reduce.insert( atom );
@@ -269,29 +276,43 @@ void TheorySep::check(Effort e) {
             if( s_atom.getKind()==kind::SEP_STAR ){
               std::vector< Node > children;
               std::vector< Node > labels;
-              for( unsigned i=0; i<s_atom.getNumChildren(); i++ ){
-                Node lblc = getLabel( s_atom, i, s_lbl );
-                Assert( !lblc.isNull() );
-                std::map< Node, Node > visited;
-                Node lc = applyLabel( s_atom[i], lblc, visited );
-                Assert( !lc.isNull() );
-                children.push_back( lc );
-                labels.push_back( lblc );
+              getStarChildren( s_atom, s_lbl, children, labels );
+              Assert( children.size()>1 );
+              std::vector< Node > conj;
+              //reduction for heap : union, pairwise disjoint
+              Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, labels[0], labels[1] );
+              for( unsigned i=2; i<labels.size(); i++ ){
+                ulem = NodeManager::currentNM()->mkNode( kind::UNION, ulem, labels[i] );
               }
-              Node conc = children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children );
+              ulem = s_lbl.eqNode( ulem );
+              Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, union : " << ulem << std::endl;
+              children.push_back( ulem );
+              Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
+              for( unsigned i=0; i<labels.size(); i++ ){
+                for( unsigned j=i; j<labels.size(); j++ ){
+                  Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, labels[i], labels[j] );
+                  Node ilem = s.eqNode( empSet );
+                  Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
+                  children.push_back( ilem );
+                }
+              }
+              Node conc = NodeManager::currentNM()->mkNode( kind::AND, children );
               Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
               Trace("sep-lemma") << "Sep::Lemma : star reduction : " << lem << std::endl;
               d_out->lemma( lem );
-              //reduction for heap : pairwise disjoint, union
-              
             }else if( s_atom.getKind()==kind::SEP_PTO ){
-              
+              Node conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );              
+              Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
+              Trace("sep-lemma") << "Sep::Lemma : pto reduction : " << lem << std::endl;
+              d_out->lemma( lem );
             }else if( s_atom.getKind()==kind::EMP_STAR ){
+              Node conc = s_lbl.eqNode( NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType())) );            
+              Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
+              Trace("sep-lemma") << "Sep::Lemma : emp reduction : " << lem << std::endl;
+              d_out->lemma( lem );
               
             }
           }
-        }else{
-          Notice() << "Negated STAR asserted to sep theory: " << fact << std::endl;
         }
       }
       //assert to equality engine
@@ -316,7 +337,8 @@ void TheorySep::check(Effort e) {
 
   if( e == EFFORT_FULL && !d_conflict ){
     Assert( d_pending.empty() );
-    bool needsCheck = true;
+    //bool needsCheck = true;
+    bool needsCheck = options::sepCheckHeap();
     while( needsCheck ){
       bool builtModel = true;
       std::map< TypeNode, HeapInfo > thi;
@@ -435,7 +457,8 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
   if( it==d_base_label.end() ){
     std::stringstream ss;
     ss << "__Lb";
-    Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), NodeManager::currentNM()->mkSetType(tn), "" );
+    TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
+    Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_base_label[tn] = n_lbl;
     return n_lbl;
   }else{
@@ -454,7 +477,8 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
       ss << lbl;
     }
     ss << "c" << child;
-    Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), NodeManager::currentNM()->mkSetType(refType), "" );
+    TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(refType));    
+    Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_label_map[atom][child] = n_lbl;
     return n_lbl;
   }else{
@@ -493,6 +517,18 @@ Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) 
   }
 }
 
+void TheorySep::getStarChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels ) {
+  for( unsigned i=0; i<atom.getNumChildren(); i++ ){
+    Node lblc = getLabel( atom, i, lbl );
+    Assert( !lblc.isNull() );
+    std::map< Node, Node > visited;
+    Node lc = applyLabel( atom[i], lblc, visited );
+    Assert( !lc.isNull() );
+    children.push_back( lc );
+    labels.push_back( lblc );
+  }
+  Assert( children.size()>1 );
+}
 
 bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
   Assert( !lbl.isNull() );

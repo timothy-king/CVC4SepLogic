@@ -5,5 +5,7 @@
 
 module SEP "theory/sep/options.h" Sep theory
 
+option sepCheckHeap --sep-check-heap bool :default true
+ use native check for heaps in sep theory
 
 endmodule
