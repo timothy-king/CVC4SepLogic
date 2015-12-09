@@ -68,7 +68,7 @@ struct SepStarTypeRule {
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
         TypeNode ctype = n[i].getType( check );
         if( ctype!=btype ){
-          throw TypeCheckingExceptionPrivate(n, "child of sep star is not boolean");
+          throw TypeCheckingExceptionPrivate(n, "child of sep star is not Boolean");
         }
       }
     }
@@ -84,7 +84,11 @@ struct SepLabelTypeRule {
     if( check ){
       TypeNode ctype = n[0].getType( check );
       if( ctype!=btype ){
-        throw TypeCheckingExceptionPrivate(n, "child of sep label is not boolean");
+        throw TypeCheckingExceptionPrivate(n, "child of sep label is not Boolean");
+      }
+      TypeNode stype = n[1].getType( check );
+      if( !stype.isSet() ){
+        throw TypeCheckingExceptionPrivate(n, "label of sep label is not a set");
       }
     }
     return btype;

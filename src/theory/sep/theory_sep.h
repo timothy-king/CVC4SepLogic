@@ -179,12 +179,13 @@ class TheorySep : public Theory {
   void conflict(TNode a, TNode b);
 
   //cache for positive polarity start reduction
-  NodeSet d_star_pos_reduce;
+  NodeSet d_reduce;
   /** inferences: maintained to ensure ref count for internally introduced nodes */
   NodeList d_infer;
   NodeList d_infer_exp;
   
   
+  std::map< TypeNode, Node > d_base_label;
   std::map< Node, std::map< int, Node > > d_label_map;
   
   class HeapAssertInfo {
@@ -197,6 +198,11 @@ class TheorySep : public Theory {
   std::map< Node, HeapAssertInfo * > d_heap_info;
   HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
   
+  //calculate the element type of the heap for spatial assertions
+  TypeNode getReferenceType( Node atom );
+  TypeNode getReferenceType2( Node n, std::map< Node, bool >& visited );
+  //get the base label for the spatial assertion
+  Node getBaseLabel( TypeNode tn );
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   
