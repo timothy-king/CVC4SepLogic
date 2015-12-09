@@ -180,6 +180,8 @@ class TheorySep : public Theory {
 
   //cache for positive polarity start reduction
   NodeSet d_reduce;
+  std::map< Node, std::map< Node, Node > > d_red_conc;
+  std::map< Node, std::map< Node, Node > > d_neg_guard;
   /** inferences: maintained to ensure ref count for internally introduced nodes */
   NodeList d_infer;
   NodeList d_infer_exp;

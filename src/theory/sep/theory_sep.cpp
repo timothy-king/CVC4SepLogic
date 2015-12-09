@@ -50,7 +50,12 @@ TheorySep::TheorySep(context::Context* c, context::UserContext* u, OutputChannel
 }
 
 TheorySep::~TheorySep() {
-
+  for( std::map< Node, HeapAssertInfo * >::iterator it = d_heap_info.begin(); it != d_heap_info.end(); ++it ){
+    delete it->second;
+  }
+  for( std::map< Node, EqcInfo * >::iterator it = d_eqc_info.begin(); it != d_eqc_info.end(); ++it ){
+    delete it->second;
+  }
 }
 
 void TheorySep::setMasterEqualityEngine(eq::EqualityEngine* eq) {
@@ -244,7 +249,7 @@ void TheorySep::check(Effort e) {
       if( d_reduce.find( atom )==d_reduce.end() ){
         Trace("sep-lemma-debug") << "Reducing unlabelled assertion " << atom << std::endl;
         d_reduce.insert( atom );
-        //introduce top-level label, add implication
+        //introduce top-level label, add iff
         TypeNode refType = getReferenceType( s_atom );
         Trace("sep-lemma-debug") << "...reference type is : " << refType << std::endl;
         Node b_lbl = getBaseLabel( refType );
@@ -256,23 +261,13 @@ void TheorySep::check(Effort e) {
     }else{
       //do reductions
       if( is_spatial ){
-        if( !polarity ){
-          // introduce guard, assert positive version
-          if( s_atom.getKind()==kind::SEP_STAR ){
-            Trace("sep-lemma-debug") << "Negated STAR asserted to sep theory: " << fact << std::endl;
-            //TODO
-            /*
-            Node guard = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
-            guard = getValuation().ensureLiteral( guard );
-            AlwaysAssert( !guard.isNull() );
-            d_out->requirePhase( guard, true );
-            */
-          }
-        }else{
           if( d_reduce.find( atom )==d_reduce.end() ){
-            Trace("sep-lemma-debug") << "Reducing positive assertion " << atom << std::endl;
-            d_reduce.insert( atom );
-            //reductions for children of star
+          Trace("sep-lemma-debug") << "Reducing assertion " << atom << std::endl;
+          d_reduce.insert( atom );
+          Node conc;
+          std::map< Node, Node >::iterator its = d_red_conc[s_lbl].find( s_atom );
+          if( its==d_red_conc[s_lbl].end() ){
+            //make conclusion based on type of assertion
             if( s_atom.getKind()==kind::SEP_STAR ){
               std::vector< Node > children;
               std::vector< Node > labels;
@@ -289,41 +284,50 @@ void TheorySep::check(Effort e) {
               children.push_back( ulem );
               Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
               for( unsigned i=0; i<labels.size(); i++ ){
-                for( unsigned j=i; j<labels.size(); j++ ){
+                for( unsigned j=(i+1); j<labels.size(); j++ ){
                   Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, labels[i], labels[j] );
                   Node ilem = s.eqNode( empSet );
                   Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
                   children.push_back( ilem );
                 }
               }
-              Node conc = NodeManager::currentNM()->mkNode( kind::AND, children );
-              Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
-              Trace("sep-lemma") << "Sep::Lemma : star reduction : " << lem << std::endl;
-              d_out->lemma( lem );
+              conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
-              Node conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );              
-              Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
-              Trace("sep-lemma") << "Sep::Lemma : pto reduction : " << lem << std::endl;
-              d_out->lemma( lem );
+              conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );              
             }else if( s_atom.getKind()==kind::EMP_STAR ){
-              Node conc = s_lbl.eqNode( NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType())) );            
-              Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
-              Trace("sep-lemma") << "Sep::Lemma : emp reduction : " << lem << std::endl;
-              d_out->lemma( lem );
-              
+              conc = s_lbl.eqNode( NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType())) );            
             }
+            d_red_conc[s_lbl][s_atom] = conc;
+          }else{
+            conc = its->second;
+          }
+          if( !polarity ){
+            // introduce guard, assert positive version
+            Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
+            d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
+            d_neg_guard[s_lbl][s_atom] = getValuation().ensureLiteral( d_neg_guard[s_lbl][s_atom] );
+            AlwaysAssert( !d_neg_guard[s_lbl][s_atom].isNull() );
+            d_out->requirePhase( d_neg_guard[s_lbl][s_atom], true );
+            Node lem = NodeManager::currentNM()->mkNode( kind::OR, d_neg_guard[s_lbl][s_atom].negate(), conc );
+            Trace("sep-lemma") << "Sep::Lemma : (neg) reduction : " << lem << std::endl;
+            d_out->lemma( lem );
+          }else{
+            //reduce based on implication
+            Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
+            Trace("sep-lemma") << "Sep::Lemma : reduction : " << lem << std::endl;
+            d_out->lemma( lem );
           }
         }
       }
       //assert to equality engine
       if( s_atom.getKind()!=kind::SEP_STAR ){
-        Debug("sep") << "Asserting " << atom << " to EE..." << std::endl;
-        if( s_atom.getKind()==kind::EQUAL ){
-          d_equalityEngine.assertEquality(s_atom, polarity, fact);
+        Trace("sep-assert") << "Asserting " << atom << " to EE..." << std::endl;
+        if( atom.getKind()==kind::EQUAL ){
+          d_equalityEngine.assertEquality(atom, polarity, fact);
         }else{
-          d_equalityEngine.assertPredicate(s_atom, polarity, fact);
+          d_equalityEngine.assertPredicate(atom, polarity, fact);
         }
-        Debug("sep") << "Done asserting " << atom << " to EE." << std::endl;
+        Trace("sep-assert") << "Done asserting " << atom << " to EE." << std::endl;
         //maybe propagate
         doPendingFacts();
       }
@@ -335,7 +339,7 @@ void TheorySep::check(Effort e) {
     }
   }
 
-  if( e == EFFORT_FULL && !d_conflict ){
+  if( e == EFFORT_FULL && !d_conflict && !d_valuation.needCheck() ){
     Assert( d_pending.empty() );
     //bool needsCheck = true;
     bool needsCheck = options::sepCheckHeap();
@@ -702,6 +706,29 @@ bool TheorySep::checkHeap( Node lbl, HeapInfo& heap ) {
         //d_out->setIncomplete();
       }
     }
+    //check negative assertions
+    if( Trace.isOn("sep-solve" ) ){
+      if( !hi->d_neg_assertions.empty() ){
+        Trace("sep-solve") << "Label " << lbl << " has " << hi->d_neg_assertions.size() << " negative assertions : " << std::endl;
+        for( NodeList::const_iterator i = hi->d_neg_assertions.begin(); i != hi->d_neg_assertions.end(); ++i ) {
+          Trace("sep-solve") << "  " << *i << std::endl;
+        }
+      }
+    }
+    for( NodeList::const_iterator ia = hi->d_neg_assertions.begin(); ia != hi->d_neg_assertions.end(); ++ia ) {
+      Node atom = (*ia);
+      Assert( d_neg_guard[lbl].find( atom )!=d_neg_guard[lbl].end() );
+      //check if the guard is asserted positively
+      Node guard = d_neg_guard[lbl][atom];
+      bool active = true;
+      bool value;
+      if( getValuation().hasSatValue( guard, value ) ) {
+        active = value;
+      }
+      if( active ){
+        Trace("sep-solve") << "--> Active negated atom : " << atom << std::endl;
+      }
+    }
     return true;
   }else{
     Trace("sep-solve") << "Label " << lbl << " has no assertions." << std::endl;
@@ -750,7 +777,6 @@ void TheorySep::addAssertionToLabel( Node atom, bool polarity, Node lbl ) {
     }
     hi->d_pos_assertions.push_back( atom );
   }else{
-    d_out->setIncomplete(); //TODO
     hi->d_neg_assertions.push_back( atom );
   }
 }
