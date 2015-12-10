@@ -102,9 +102,12 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
   Node retNode = node;
   switch (node.getKind()) {
     case kind::SEP_LABEL: {
+      /*
       if( node[0].getKind()==kind::SEP_PTO ){
         node[1].eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, node[0][0] ) );
-      }else if( node[0].getKind()==kind::EMP_STAR ){
+      }
+      */
+      if( node[0].getKind()==kind::EMP_STAR ){
         node[1].eqNode( NodeManager::currentNM()->mkConst(EmptySet(node[1].getType().toType())) );
       }
       break;

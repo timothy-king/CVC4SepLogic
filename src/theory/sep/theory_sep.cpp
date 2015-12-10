@@ -255,7 +255,7 @@ void TheorySep::check(Effort e) {
         Trace("sep-lemma-debug") << "...reference type is : " << refType << std::endl;
         Node b_lbl = getBaseLabel( refType );
         Node s_atom_new = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, s_atom, b_lbl );
-        Node lem = NodeManager::currentNM()->mkNode( kind::IFF, s_atom, s_atom_new );
+        Node lem = NodeManager::currentNM()->mkNode( kind::OR, s_atom.negate(), s_atom_new );
         Trace("sep-lemma") << "Sep::Lemma : base reduction : " << lem << std::endl;
         d_out->lemma( lem );
       }
@@ -516,7 +516,7 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
 
 Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) {
   Assert( n.getKind()!=kind::SEP_LABEL );
-  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_PTO ){
+  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_PTO || n.getKind()==kind::EMP_STAR ){
     return NodeManager::currentNM()->mkNode( kind::SEP_LABEL, n, lbl );
   }else if( !n.getType().isBoolean() || n.getNumChildren()==0 ){
     return n;
