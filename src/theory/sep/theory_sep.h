@@ -196,7 +196,7 @@ class TheorySep : public Theory {
     ~HeapAssertInfo(){}
     context::CDO< Node > d_pto;
     std::vector< Node > d_pos_assertions;
-    std::vector< Node > d_neg_assertions;
+    //std::vector< Node > d_neg_assertions;
   };
   std::map< Node, HeapAssertInfo * > d_heap_info;
   HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
@@ -233,15 +233,18 @@ class TheorySep : public Theory {
   class HeapInfo {
   public:
     HeapInfo() : d_strict( false ) {}
-    std::map< Node, HeapLoc > d_heap;
+    //std::map< Node, HeapLoc > d_heap;
     bool d_strict;
     //in the case it is a strict heap, d_exp explains why this heap is exactly this
-    std::vector< Node > d_strict_exp;
+    //std::vector< Node > d_strict_exp;
+    std::vector< Node > d_heap_locs;
   };
+  std::map< Node, HeapInfo > d_label_model;
 
-  bool checkHeap( Node lbl, HeapInfo& heap );
+  //bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
   void mergePto( Node p1, Node p2, int index );
+  void computeLabelModel( Node lbl );
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );
