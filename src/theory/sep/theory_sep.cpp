@@ -54,7 +54,7 @@ TheorySep::~TheorySep() {
   for( std::map< Node, HeapAssertInfo * >::iterator it = d_heap_info.begin(); it != d_heap_info.end(); ++it ){
     delete it->second;
   }
-  for( std::map< Node, EqcInfo * >::iterator it = d_eqc_info.begin(); it != d_eqc_info.end(); ++it ){
+  for( std::map< Node, HeapAssertInfo * >::iterator it = d_eqc_info.begin(); it != d_eqc_info.end(); ++it ){
     delete it->second;
   }
 }
@@ -362,10 +362,7 @@ void TheorySep::check(Effort e) {
     Trace("sep-process") << "Checking heap at full effort..." << std::endl;
     d_label_model.clear();
     //build positive/negative assertion lists for labels
-    for( std::map< Node, HeapAssertInfo * >::iterator it = d_heap_info.begin(); it != d_heap_info.end(); ++it ){
-      it->second->d_pos_assertions.clear();
-      //it->second->d_neg_assertions.clear();
-    }
+    d_heap_pos_assertions.clear();
     Trace("sep-process") << "--- Current spatial assertions : " << std::endl;
     for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
       Node fact = (*i);
@@ -376,8 +373,7 @@ void TheorySep::check(Effort e) {
         Assert( atom.getKind()==kind::SEP_LABEL );
         TNode s_atom = atom[0];
         TNode s_lbl = atom[1];
-        HeapAssertInfo * hi = getOrMakeHeapAssertInfo( s_lbl, true );
-        hi->d_pos_assertions.push_back( s_atom );
+        d_heap_pos_assertions[s_lbl].push_back( s_atom );
       }
     }
     Trace("sep-process") << "---" << std::endl;
@@ -481,7 +477,7 @@ void TheorySep::conflict(TNode a, TNode b) {
 }
 
 
-TheorySep::HeapAssertInfo::HeapAssertInfo( context::Context* c ) : d_pto(c) {
+TheorySep::HeapAssertInfo::HeapAssertInfo( context::Context* c ) : d_pto(c), d_has_neg_pto(c,false) {
 
 }
 
@@ -500,15 +496,11 @@ TheorySep::HeapAssertInfo * TheorySep::getOrMakeHeapAssertInfo( Node lbl, bool d
   }
 }
 
-TheorySep::EqcInfo::EqcInfo( context::Context* c ) : d_pto(c) {
-
-}
-
-TheorySep::EqcInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
-  std::map< Node, EqcInfo* >::iterator e_i = d_eqc_info.find( n );
+TheorySep::HeapAssertInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
+  std::map< Node, HeapAssertInfo* >::iterator e_i = d_eqc_info.find( n );
   if( e_i==d_eqc_info.end() ){
     if( doMake ){
-      EqcInfo* ei = new EqcInfo( getSatContext() );
+      HeapAssertInfo* ei = new HeapAssertInfo( getSatContext() );
       d_eqc_info[n] = ei;
       return ei;
     }else{
@@ -627,10 +619,17 @@ void TheorySep::computeLabelModel( Node lbl ) {
   if( d_label_model.find( lbl )==d_label_model.end() ){
     d_label_model[lbl].d_strict = false;
     HeapAssertInfo * hi = getOrMakeHeapAssertInfo( lbl );
-    if( hi ){
-      if( hi->d_pto.get().isNull() ){
-        for( unsigned ia = 0; ia<hi->d_pos_assertions.size(); ++ia ) {
-          Node atom = hi->d_pos_assertions[ia];
+    if( hi && !hi->d_pto.get().isNull() ){
+      Node atom = hi->d_pto.get();
+      Trace("sep-process-debug") << "...model for " << lbl << " : " << atom << std::endl;
+      //d_label_model[lbl].d_heap[atom[0]].d_val = atom[1];
+      d_label_model[lbl].d_heap_locs.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, atom[0] ) );
+      d_label_model[lbl].d_strict = true;
+    }else{
+      std::map< Node, std::vector< Node > >::iterator ita = d_heap_pos_assertions.find( lbl );
+      if( ita!=d_heap_pos_assertions.end() ){
+        for( unsigned ia = 0; ia<ita->second.size(); ++ia ) {
+          Node atom = ita->second[ia];
           Assert( atom.getKind()!=kind::SEP_LABEL );
           if( atom.getKind()==kind::SEP_STAR ){
             //compute model for each child, take union, which is guarenteed to be disjoint
@@ -649,36 +648,23 @@ void TheorySep::computeLabelModel( Node lbl ) {
           }
         }
       }else{
-        Node atom = hi->d_pto.get();
-        Trace("sep-process-debug") << "...model for " << lbl << " : " << atom << std::endl;
-        //d_label_model[lbl].d_heap[atom[0]].d_val = atom[1];
-        d_label_model[lbl].d_heap_locs.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, atom[0] ) );
-        d_label_model[lbl].d_strict = true;
+        // no constraints
       }
-    }else{
-      // no constraints
     }
   }
 }
 
 void TheorySep::addAssertionToLabel( Node atom, bool polarity, Node lbl ) {
   Trace("sep-process") << "Add assertion " << atom << " to label " << lbl << ", pol = " << polarity << std::endl;
-  if( polarity && atom.getKind()==kind::SEP_PTO ){
+  if( atom.getKind()==kind::SEP_PTO ){
     //associate the equivalence class of the lhs with this pto
     Node r = getRepresentative( atom[0] );
-    EqcInfo * ei = getOrMakeEqcInfo( r, true );
-    if( !ei->d_pto.get().isNull() ){
-      mergePto( ei->d_pto.get(), atom, 1 );
-    }else{
-      ei->d_pto.set( atom );
-    }
+    HeapAssertInfo * ei = getOrMakeEqcInfo( r, true );
+    addPto( ei, atom, polarity, 1 );
+
     //associate the label with this pto
     HeapAssertInfo * hi = getOrMakeHeapAssertInfo( lbl, true );
-    if( !hi->d_pto.get().isNull() ){
-      mergePto( hi->d_pto.get(), atom, 0 );
-    }else{
-      hi->d_pto.set( atom );
-    }
+    addPto( hi, atom, polarity, 0 );
   }
 }
 
@@ -716,13 +702,33 @@ bool TheorySep::areDisequal( Node a, Node b ){
 }
 
 void TheorySep::eqNotifyPreMerge(TNode t1, TNode t2) {
-  EqcInfo * e2 = getOrMakeEqcInfo( t2, false );
+  HeapAssertInfo * e2 = getOrMakeEqcInfo( t2, false );
   if( e2 && !e2->d_pto.get().isNull() ){
-    EqcInfo * e1 = getOrMakeEqcInfo( t1, true );
+    HeapAssertInfo * e1 = getOrMakeEqcInfo( t1, true );
     if( !e1->d_pto.get().isNull() ){
       mergePto( e1->d_pto.get(), e2->d_pto.get(), 1 );
     }else{
       e1->d_pto.set( e2->d_pto.get() );
+    }
+  }
+}
+
+void TheorySep::addPto( HeapAssertInfo * ei, Node p, bool polarity, int c_index ) {
+  if( !ei->d_pto.get().isNull() ){
+    if( polarity ){
+      mergePto( ei->d_pto.get(), p, c_index );
+    }else{
+      //TODO
+    }
+  }else{
+    if( polarity ){
+      ei->d_pto.set( p );
+      if( ei->d_has_neg_pto.get() ){
+        //TODO
+        ei->d_has_neg_pto.set( false );
+      }
+    }else{
+      ei->d_has_neg_pto.set( true );
     }
   }
 }

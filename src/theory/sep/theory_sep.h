@@ -195,20 +195,14 @@ class TheorySep : public Theory {
     HeapAssertInfo( context::Context* c );
     ~HeapAssertInfo(){}
     context::CDO< Node > d_pto;
-    std::vector< Node > d_pos_assertions;
-    //std::vector< Node > d_neg_assertions;
+    context::CDO< bool > d_has_neg_pto;
   };
   std::map< Node, HeapAssertInfo * > d_heap_info;
   HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
+  std::map< Node, std::vector< Node > > d_heap_pos_assertions;
 
-  class EqcInfo {
-  public:
-    EqcInfo( context::Context* c );
-    ~EqcInfo(){}
-    context::CDO< Node > d_pto;
-  };
-  std::map< Node, EqcInfo * > d_eqc_info;
-  EqcInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
+  std::map< Node, HeapAssertInfo * > d_eqc_info;
+  HeapAssertInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
 
   //calculate the element type of the heap for spatial assertions
   TypeNode getReferenceType( Node atom );
@@ -245,6 +239,7 @@ class TheorySep : public Theory {
 
   //bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
+  void addPto( HeapAssertInfo * ei, Node p, bool polarity, int c_index );
   void mergePto( Node p1, Node p2, int index );
   void computeLabelModel( Node lbl );
 private:
