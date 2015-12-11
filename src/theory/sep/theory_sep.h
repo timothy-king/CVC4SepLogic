@@ -238,6 +238,8 @@ class TheorySep : public Theory {
     //in the case it is a strict heap, d_exp explains why this heap is exactly this
     //std::vector< Node > d_strict_exp;
     std::vector< Node > d_heap_locs;
+    //get value
+    Node getValue( TypeNode tn );
   };
   std::map< Node, HeapInfo > d_label_model;
 
