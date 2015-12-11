@@ -199,7 +199,6 @@ class TheorySep : public Theory {
   };
   std::map< Node, HeapAssertInfo * > d_heap_info;
   HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
-  std::map< Node, std::vector< Node > > d_heap_pos_assertions;
 
   std::map< Node, HeapAssertInfo * > d_eqc_info;
   HeapAssertInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
@@ -212,8 +211,6 @@ class TheorySep : public Theory {
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   void getStarChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels );
-
-  void addAssertionToLabel( Node atom, bool polarity, Node lbl );
 
   class HeapLoc {
   public:
@@ -235,11 +232,15 @@ class TheorySep : public Theory {
     //get value
     Node getValue( TypeNode tn );
   };
+  //current assertions
+  std::map< Node, std::vector< Node > > d_heap_pos_assertions;
+  std::map< Node, Node > d_heap_pos_pto;
   std::map< Node, HeapInfo > d_label_model;
 
   //bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
-  void addPto( HeapAssertInfo * ei, Node p, bool polarity, int c_index );
+  void validatePto( HeapAssertInfo * ei, Node ei_n, int c_index );
+  void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity, int c_index );
   void mergePto( Node p1, Node p2, int index );
   void computeLabelModel( Node lbl );
 private:
@@ -249,6 +250,7 @@ private:
   bool areDisequal( Node a, Node b );
   /** called when two equivalence classes will merge */
   void eqNotifyPreMerge(TNode t1, TNode t2);
+  void eqNotifyPostMerge(TNode t1, TNode t2);
 
   void sendLemma( std::vector< Node >& ant, Node conc, const char * c, bool infer = false );
   void doPendingFacts();
