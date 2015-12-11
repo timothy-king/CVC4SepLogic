@@ -75,7 +75,9 @@ void TheorySepRewriter::getAndChildren( Node n, std::vector< Node >& s_children,
       }
     }else{
       if( std::find( ns_children.begin(), ns_children.end(), n )==ns_children.end() ){
-        ns_children.push_back( n );
+        if( n!=NodeManager::currentNM()->mkConst(true) ){
+          ns_children.push_back( n );
+        }
       }
     }
   }

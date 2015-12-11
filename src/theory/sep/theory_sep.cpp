@@ -427,27 +427,58 @@ void TheorySep::check(Effort e) {
             if( d_label_map.find( s_atom )!=d_label_map.end() ){
               TypeNode tn = getReferenceType( s_atom );
               tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
-              Node b_lbl_mval;
-              std::vector< Node > conc;
+              //compute overall label
+              computeLabelModel( s_lbl );
+              Trace("sep-process") << "    overall model : " << std::endl;
+              debugPrintHeap( d_label_model[s_lbl], "sep-process" );
+              Trace("sep-process") << std::endl;
+              std::map< Node, bool > heap_vals;
+              for( unsigned j=0; j<d_label_model[s_lbl].d_heap_locs.size(); j++ ){
+                heap_vals[d_label_model[s_lbl].d_heap_locs[j]] = true;
+              }
+              std::map< int, Node > mvals;
+              int nstrict_child = -1;
               for( std::map< int, Node >::iterator itl = d_label_map[s_atom].begin(); itl != d_label_map[s_atom].end(); ++itl ){
                 computeLabelModel( itl->second );
                 Node lbl_mval = d_label_model[itl->second].getValue( tn );
                 Trace("sep-process-debug") << "  child " << itl->first << " : " << itl->second << ", mval = " << lbl_mval << std::endl;
+                //take difference from overall
+                for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs.size(); j++ ){
+                  Node loc = d_label_model[itl->second].d_heap_locs[j];
+                  if( heap_vals.find( loc )!=heap_vals.end() ){
+                    heap_vals.erase( loc );
+                  }
+                }
+                // record if non-strict
+                if( !d_label_model[itl->second].d_strict ){
+                  nstrict_child = itl->first;
+                }
+                mvals[itl->first] = lbl_mval;
+              }
+              Trace("sep-process-debug") << "    non-strict child : " << nstrict_child << std::endl;
+              if( !heap_vals.empty() ){
+                Assert( nstrict_child!=-1 );
+                Trace("sep-process-debug") << "    unaccounted locations : ";
+                for( std::map< Node, bool >::iterator it = heap_vals.begin(); it != heap_vals.end(); ++it ){
+                  Trace("sep-process-debug") << it->first << " ";
+                  mvals[nstrict_child] = NodeManager::currentNM()->mkNode( kind::UNION, mvals[nstrict_child], it->first );
+                }
+                Trace("sep-process-debug") << std::endl;
+              }else{
+                Trace("sep-process-debug") << "    children match the overall model." << std::endl;
+              }
+              std::vector< Node > conc;
+              for( std::map< int, Node >::iterator itl = d_label_map[s_atom].begin(); itl != d_label_map[s_atom].end(); ++itl ){
                 std::map< Node, Node > visited;
-                Node c = applyLabel( s_atom[itl->first], lbl_mval, visited );
+                Node c = applyLabel( s_atom[itl->first], mvals[itl->first], visited );
                 Trace("sep-process-debug") << "    applied inst : " << c << std::endl;
                 conc.push_back( c.negate() );
-                if( b_lbl_mval.isNull() ){
-                  b_lbl_mval = lbl_mval;
-                }else{
-                  b_lbl_mval = NodeManager::currentNM()->mkNode( kind::UNION, b_lbl_mval, lbl_mval );
-                }
               }
-              Trace("sep-process") << "    model : " << b_lbl_mval << std::endl;
               // Now, assert model-instantiated implication based on the negation 
+              Node o_b_lbl_mval = d_label_model[s_lbl].getValue( tn );
               std::vector< Node > lemc;
               lemc.push_back( atom );
-              lemc.push_back( s_lbl.eqNode( b_lbl_mval ).negate() );
+              lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
               lemc.insert( lemc.end(), conc.begin(), conc.end() );
               Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
               Trace("sep-lemma") << "Sep::Lemma : negated star refinement : " << lem << std::endl;
@@ -455,10 +486,7 @@ void TheorySep::check(Effort e) {
             }else{
               Trace("sep-process-debug") << "  no children." << std::endl;
               Assert( s_atom.getKind()==kind::SEP_PTO );
-              
             }
-            //TODO
-            d_out->setIncomplete();
           }
         }
       }
