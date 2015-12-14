@@ -207,7 +207,7 @@ void TheorySep::computeCareGraph() {
 void TheorySep::collectModelInfo( TheoryModel* m, bool fullModel )
 {
   // Send the equality engine information to the model
-  //m->assertEqualityEngine(&d_equalityEngine, &termSet);
+  m->assertEqualityEngine( &d_equalityEngine );
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -659,7 +659,8 @@ void TheorySep::computeLabelModel( Node lbl ) {
       Node atom = itap->second;
       Trace("sep-process-debug") << "...model for " << lbl << " : " << atom << std::endl;
       //d_label_model[lbl].d_heap[atom[0]].d_val = atom[1];
-      d_label_model[lbl].d_heap_locs.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, atom[0] ) );
+      Node r = getRepresentative( atom[0] );
+      d_label_model[lbl].d_heap_locs.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, r ) );
       d_label_model[lbl].d_strict = true;
     }else{
       std::map< Node, std::vector< Node > >::iterator ita = d_heap_pos_assertions.find( lbl );
