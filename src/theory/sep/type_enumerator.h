@@ -33,7 +33,7 @@ class RefEnumerator : public TypeEnumeratorBase<RefEnumerator> {
   TypeEnumerator d_val;
   TypeNode d_constituentType;
   bool d_finished;
-
+  Integer d_count;
 public:
 
   RefEnumerator(TypeNode type) throw(AssertionException) :
@@ -41,15 +41,17 @@ public:
     d_nm(NodeManager::currentNM()),
     d_val(type.getRefConstituentType()),
     d_constituentType(type.getRefConstituentType()),
-    d_finished(false)
-  {}
+    d_finished(false), 
+    d_count(0){
+  }
   RefEnumerator(const RefEnumerator& ae) throw() :
     TypeEnumeratorBase<RefEnumerator>(ae.d_nm->mkRefType(ae.d_constituentType)),
     d_nm(ae.d_nm),
     d_val(ae.d_val),
     d_constituentType(ae.d_constituentType),
-    d_finished(ae.d_finished)
-  {}
+    d_finished(ae.d_finished), 
+    d_count(ae.d_count){
+  }
 
   ~RefEnumerator() {}
 
@@ -58,30 +60,33 @@ public:
       throw NoMoreValuesException(getType());
     }
     //TODO : convert to ref
-    Node n = *d_val;
-    Trace("sep-type-enum") << "operator * prerewrite: " << n << std::endl;
-    n = Rewriter::rewrite(n);
-    Trace("sep-type-enum") << "operator * returning: " << n << std::endl;
-    return n;
+    //Node n = *d_val;
+    //Trace("sep-type-enum") << "operator * prerewrite: " << n << std::endl;
+    //n = Rewriter::rewrite(n);
+    Trace("sep-type-enum") << "SepEnum: operator * returning uc: " << d_count << " " << getType() << std::endl;
+    return NodeManager::currentNM()->mkConst(UninterpretedConstant(getType().toType(), d_count));
   }
 
   RefEnumerator& operator++() throw() {
-    Trace("sep-type-enum") << "operator++ called, **this = " << **this << std::endl;
+    Trace("sep-type-enum") << "SepEnum: operator++ called, **this = " << **this << std::endl;
 
     if (d_finished) {
-      Trace("sep-type-enum") << "operator++ finished!" << std::endl;
+      Trace("sep-type-enum") << "SepEnum: operator++ already finished!" << std::endl;
       return *this;
     }
+    //enumerate the constituent type (for cardinality purposes only)
     ++d_val;
     if (d_val.isFinished()) {
-      Trace("sep-type-enum") << "operator++ finished!" << std::endl;
+      Trace("sep-type-enum") << "SepEnum: operator++ finished!" << std::endl;
       d_finished = true;
+    }else{
+      d_count += 1;
     }
     return *this;
   }
 
   bool isFinished() throw() {
-    Trace("sep-type-enum") << "isFinished returning: " << d_finished << std::endl;
+    Trace("sep-type-enum") << "SepEnum: isFinished returning: " << d_finished << std::endl;
     return d_finished;
   }
 
