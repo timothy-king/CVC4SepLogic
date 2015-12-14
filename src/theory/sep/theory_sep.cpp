@@ -433,8 +433,10 @@ void TheorySep::check(Effort e) {
               debugPrintHeap( d_label_model[s_lbl], "sep-process" );
               Trace("sep-process") << std::endl;
               std::map< Node, bool > heap_vals;
-              for( unsigned j=0; j<d_label_model[s_lbl].d_heap_locs.size(); j++ ){
-                heap_vals[d_label_model[s_lbl].d_heap_locs[j]] = true;
+              std::map< Node, Node > heap_loc_to_actual;
+              for( unsigned j=0; j<d_label_model[s_lbl].d_heap_locs_r.size(); j++ ){
+                heap_vals[d_label_model[s_lbl].d_heap_locs_r[j]] = true;
+                heap_loc_to_actual[d_label_model[s_lbl].d_heap_locs_r[j]] = d_label_model[s_lbl].d_heap_locs[j];
               }
               std::map< int, Node > mvals;
               int nstrict_child = -1;
@@ -443,10 +445,10 @@ void TheorySep::check(Effort e) {
                 Node lbl_mval = d_label_model[itl->second].getValue( tn );
                 Trace("sep-process-debug") << "  child " << itl->first << " : " << itl->second << ", mval = " << lbl_mval << std::endl;
                 //take difference from overall
-                for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs.size(); j++ ){
-                  Node loc = d_label_model[itl->second].d_heap_locs[j];
-                  if( heap_vals.find( loc )!=heap_vals.end() ){
-                    heap_vals.erase( loc );
+                for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs_r.size(); j++ ){
+                  Node loc_r = d_label_model[itl->second].d_heap_locs_r[j];
+                  if( heap_vals.find( loc_r )!=heap_vals.end() ){
+                    heap_vals.erase( loc_r );
                   }
                 }
                 // record if non-strict
@@ -460,8 +462,10 @@ void TheorySep::check(Effort e) {
                 Assert( nstrict_child!=-1 );
                 Trace("sep-process-debug") << "    unaccounted locations : ";
                 for( std::map< Node, bool >::iterator it = heap_vals.begin(); it != heap_vals.end(); ++it ){
-                  Trace("sep-process-debug") << it->first << " ";
-                  mvals[nstrict_child] = NodeManager::currentNM()->mkNode( kind::UNION, mvals[nstrict_child], it->first );
+                  Assert( heap_loc_to_actual.find( it->first )!=heap_loc_to_actual.end() );
+                  Node ac_loc = heap_loc_to_actual[it->first];
+                  Trace("sep-process-debug") << ac_loc << " ";
+                  mvals[nstrict_child] = NodeManager::currentNM()->mkNode( kind::UNION, mvals[nstrict_child], ac_loc );
                 }
                 Trace("sep-process-debug") << std::endl;
               }else{
@@ -548,27 +552,38 @@ TheorySep::HeapAssertInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
 }
 
 TypeNode TheorySep::getReferenceType( Node atom ) {
-  std::map< Node, bool > visited;
-  TypeNode tn = getReferenceType2( atom, visited );
-  if( tn.isNull() ){
-    return NodeManager::currentNM()->booleanType();
-  }else{
+  std::map< Node, TypeNode >::iterator it = d_reference_type.find( atom );
+  if( it==d_reference_type.end() ){
+    std::map< Node, bool > visited;
+    TypeNode tn = getReferenceType2( atom, atom, visited );
+    if( tn.isNull() ){
+      tn = NodeManager::currentNM()->booleanType();
+    }
+    d_reference_type[atom] = tn;
     return tn;
+  }else{
+    return it->second;
   }
 }
 
-TypeNode TheorySep::getReferenceType2( Node n, std::map< Node, bool >& visited ) {
+TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >& visited ) {
   if( visited.find( n )==visited.end() ){
     visited[n] = true;
     if( n.getKind()==kind::SEP_PTO ){
+      //if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references.end() ){
+      //  d_references[atom].push_back( n[0] );
+      //}
       return n[1].getType();
     }else{
+      //TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
-        TypeNode tn = getReferenceType2( n[i], visited );
+        TypeNode tn = getReferenceType2( atom, n[i], visited );
         if( !tn.isNull() ){
+          //otn = tn;
           return tn;
         }
       }
+      //return otn;
     }
   }
   return TypeNode::null();
@@ -660,7 +675,8 @@ void TheorySep::computeLabelModel( Node lbl ) {
       Trace("sep-process-debug") << "...model for " << lbl << " : " << atom << std::endl;
       //d_label_model[lbl].d_heap[atom[0]].d_val = atom[1];
       Node r = getRepresentative( atom[0] );
-      d_label_model[lbl].d_heap_locs.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, r ) );
+      d_label_model[lbl].d_heap_locs.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, atom[0] ) );
+      d_label_model[lbl].d_heap_locs_r.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, r ) );
       d_label_model[lbl].d_strict = true;
     }else{
       std::map< Node, std::vector< Node > >::iterator ita = d_heap_pos_assertions.find( lbl );
@@ -675,8 +691,10 @@ void TheorySep::computeLabelModel( Node lbl ) {
               computeLabelModel( itl->second );
               for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs.size(); j++ ){
                 Node loc = d_label_model[itl->second].d_heap_locs[j];
-                if( std::find( d_label_model[lbl].d_heap_locs.begin(), d_label_model[lbl].d_heap_locs.end(), loc )==d_label_model[lbl].d_heap_locs.end() ){
+                Node loc_r = d_label_model[itl->second].d_heap_locs_r[j];
+                if( std::find( d_label_model[lbl].d_heap_locs_r.begin(), d_label_model[lbl].d_heap_locs_r.end(), loc_r )==d_label_model[lbl].d_heap_locs_r.end() ){
                   d_label_model[lbl].d_heap_locs.push_back( loc );
+                  d_label_model[lbl].d_heap_locs_r.push_back( loc_r );
                 }
               }
               isStrict = isStrict && d_label_model[itl->second].d_strict;
@@ -810,6 +828,7 @@ void TheorySep::mergePto( Node p1, Node p2 ) {
   if( !areEqual( p1[0][1], p2[0][1] ) ){
     std::vector< Node > exp;
     if( p1[0][0]!=p2[0][0] ){
+      Assert( areEqual( p1[0][0], p2[0][0] ) );
       exp.push_back( p1[0][0].eqNode( p2[0][0] ) );
     }
     exp.push_back( p1 );
@@ -819,7 +838,7 @@ void TheorySep::mergePto( Node p1, Node p2 ) {
 }
 
 void TheorySep::sendLemma( std::vector< Node >& ant, Node conc, const char * c, bool infer ) {
-  Trace("sep-lemma-debug") << "Rewriting inference : " << conc << std::endl;
+  Trace("sep-lemma-debug") << "Do rewrite on inference : " << conc << std::endl;
   conc = Rewriter::rewrite( conc );
   Trace("sep-lemma-debug") << "Got : " << conc << std::endl;
   if( conc!=d_true ){

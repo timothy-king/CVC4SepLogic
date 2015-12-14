@@ -27,7 +27,8 @@ TESTS =	\
   sep-03.smt2 \
   sep-find2.smt2 \
   sep-neg-nstrict.smt2 \
-  sep-plus1.smt2
+  sep-plus1.smt2 \
+  sep-nterm-val-model.smt2
 
 
 FAILING_TESTS =

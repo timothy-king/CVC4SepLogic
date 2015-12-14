@@ -182,6 +182,9 @@ class TheorySep : public Theory {
   NodeSet d_reduce;
   std::map< Node, std::map< Node, Node > > d_red_conc;
   std::map< Node, std::map< Node, Node > > d_neg_guard;
+  //cache for references
+  std::map< Node, TypeNode > d_reference_type;
+  //std::map< Node, std::vector< Node > > d_references;
   /** inferences: maintained to ensure ref count for internally introduced nodes */
   NodeList d_infer;
   NodeList d_infer_exp;
@@ -205,7 +208,7 @@ class TheorySep : public Theory {
 
   //calculate the element type of the heap for spatial assertions
   TypeNode getReferenceType( Node atom );
-  TypeNode getReferenceType2( Node n, std::map< Node, bool >& visited );
+  TypeNode getReferenceType2( Node atom, Node n, std::map< Node, bool >& visited );
   //get the base label for the spatial assertion
   Node getBaseLabel( TypeNode tn );
   Node getLabel( Node atom, int child, Node lbl );
@@ -229,6 +232,7 @@ class TheorySep : public Theory {
     //in the case it is a strict heap, d_exp explains why this heap is exactly this
     //std::vector< Node > d_strict_exp;
     std::vector< Node > d_heap_locs;
+    std::vector< Node > d_heap_locs_r;
     //get value
     Node getValue( TypeNode tn );
   };
