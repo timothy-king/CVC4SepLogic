@@ -30,7 +30,7 @@ namespace sep {
 
 class RefEnumerator : public TypeEnumeratorBase<RefEnumerator> {
   NodeManager* d_nm;
-  TypeEnumerator d_val;
+  //TypeEnumerator d_val;
   TypeNode d_constituentType;
   bool d_finished;
   Integer d_count;
@@ -39,7 +39,7 @@ public:
   RefEnumerator(TypeNode type) throw(AssertionException) :
     TypeEnumeratorBase<RefEnumerator>(type),
     d_nm(NodeManager::currentNM()),
-    d_val(type.getRefConstituentType()),
+    //d_val(type.getRefConstituentType()),
     d_constituentType(type.getRefConstituentType()),
     d_finished(false), 
     d_count(0){
@@ -47,7 +47,7 @@ public:
   RefEnumerator(const RefEnumerator& ae) throw() :
     TypeEnumeratorBase<RefEnumerator>(ae.d_nm->mkRefType(ae.d_constituentType)),
     d_nm(ae.d_nm),
-    d_val(ae.d_val),
+    //d_val(ae.d_val),
     d_constituentType(ae.d_constituentType),
     d_finished(ae.d_finished), 
     d_count(ae.d_count){
@@ -74,14 +74,15 @@ public:
       Trace("sep-type-enum") << "SepEnum: operator++ already finished!" << std::endl;
       return *this;
     }
+    /*
     //enumerate the constituent type (for cardinality purposes only)
     ++d_val;
     if (d_val.isFinished()) {
       Trace("sep-type-enum") << "SepEnum: operator++ finished!" << std::endl;
       d_finished = true;
     }else{
-      d_count += 1;
-    }
+    */
+    d_count += 1;
     return *this;
   }
 

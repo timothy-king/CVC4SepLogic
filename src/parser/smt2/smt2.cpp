@@ -164,9 +164,9 @@ void Smt2::addFloatingPointOperators() {
 void Smt2::addSepOperators() {
   addOperator(kind::SEP_STAR, "sep");
   addOperator(kind::SEP_PTO, "pto");
-
   Parser::addOperator(kind::SEP_STAR);
   Parser::addOperator(kind::SEP_PTO);
+  //defineVar("emp",getExprManager()->mkConst( EmpStar() ));
 }
 
 void Smt2::addTheory(Theory theory) {

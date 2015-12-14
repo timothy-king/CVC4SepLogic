@@ -39,6 +39,9 @@ public:
     throw (TypeCheckingExceptionPrivate, AssertionException) {
     return nodeManager->booleanType();
   }
+  inline static bool computeIsConst(NodeManager* nodeManager, TNode n) {
+    return false;
+  }
 };
   
 struct SepPtoTypeRule {
