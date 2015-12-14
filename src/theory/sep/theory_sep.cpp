@@ -351,7 +351,7 @@ void TheorySep::check(Effort e) {
         //associate the equivalence class of the lhs with this pto
         Node r = getRepresentative( s_atom[0] );
         HeapAssertInfo * ei = getOrMakeEqcInfo( r, true );
-        addPto( ei, r, atom, polarity, 1 );
+        addPto( ei, r, atom, polarity );
       }
       //maybe propagate
       doPendingFacts();
@@ -725,57 +725,55 @@ bool TheorySep::areDisequal( Node a, Node b ){
 }
 
 void TheorySep::eqNotifyPreMerge(TNode t1, TNode t2) {
+
+}
+
+void TheorySep::eqNotifyPostMerge(TNode t1, TNode t2) {
   HeapAssertInfo * e2 = getOrMakeEqcInfo( t2, false );
   if( e2 && ( !e2->d_pto.get().isNull() || e2->d_has_neg_pto.get() ) ){
     HeapAssertInfo * e1 = getOrMakeEqcInfo( t1, true );
     if( !e1->d_pto.get().isNull() ){
-      mergePto( e1->d_pto.get(), e2->d_pto.get(), 1 );
+      Trace("sep-pto-debug") << "While merging " << t1 << " " << t2 << ", merge pto." << std::endl;
+      mergePto( e1->d_pto.get(), e2->d_pto.get() );
     }else{
       e1->d_pto.set( e2->d_pto.get() );
     }
     e1->d_has_neg_pto.set( e1->d_has_neg_pto.get() || e2->d_has_neg_pto.get() );
-  }
-}
-
-void TheorySep::eqNotifyPostMerge(TNode t1, TNode t2) {
-  HeapAssertInfo * e1 = getOrMakeEqcInfo( t1, false );
-  if( e1 ){
     //validate
-    validatePto( e1, t1, 1 );
+    validatePto( e1, t1 );
   }
 }
 
-void TheorySep::validatePto( HeapAssertInfo * ei, Node ei_n, int c_index ) {
-  if( c_index==1 ){
-    if( !ei->d_pto.get().isNull() && ei->d_has_neg_pto.get() ){
-      for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
-        Node fact = (*i);
-        bool polarity = fact.getKind() != kind::NOT;
-        if( !polarity ){
-          TNode atom = polarity ? fact : fact[0];
-          Assert( atom.getKind()==kind::SEP_LABEL );
-          TNode s_atom = atom[0];
-          if( s_atom.getKind()==kind::SEP_PTO ){
-            if( areEqual( s_atom[0], ei_n ) ){
-              addPto( ei, ei_n, atom, false, c_index );
-            }
+void TheorySep::validatePto( HeapAssertInfo * ei, Node ei_n ) {
+  if( !ei->d_pto.get().isNull() && ei->d_has_neg_pto.get() ){
+    for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
+      Node fact = (*i);
+      bool polarity = fact.getKind() != kind::NOT;
+      if( !polarity ){
+        TNode atom = polarity ? fact : fact[0];
+        Assert( atom.getKind()==kind::SEP_LABEL );
+        TNode s_atom = atom[0];
+        if( s_atom.getKind()==kind::SEP_PTO ){
+          if( areEqual( s_atom[0], ei_n ) ){
+            addPto( ei, ei_n, atom, false );
           }
         }
       }
-      //we have now processed all pending negated pto
-      ei->d_has_neg_pto.set( false );
     }
+    //we have now processed all pending negated pto
+    ei->d_has_neg_pto.set( false );
   }
 }
 
-void TheorySep::addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity, int c_index ) {
+void TheorySep::addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity ) {
   Trace("sep-pto") << "Add pto : " << p << ", pol = " << polarity << " to eqc " << ei_n << std::endl;
   if( !ei->d_pto.get().isNull() ){
     if( polarity ){
-      mergePto( ei->d_pto.get(), p, c_index );
+      Trace("sep-pto-debug") << "...eqc " << ei_n << " already has pto " << ei->d_pto.get() << ", merge." << std::endl;
+      mergePto( ei->d_pto.get(), p );
     }else{
       Node pb = ei->d_pto.get();
-      Trace("sep-pto") << "Process positive/negated pto : " << " " << pb << " " << p << ", c_index = " << c_index << std::endl;
+      Trace("sep-pto") << "Process positive/negated pto : " << " " << pb << " " << p << std::endl;
       Assert( pb.getKind()==kind::SEP_LABEL && pb[0].getKind()==kind::SEP_PTO );
       Assert( p.getKind()==kind::SEP_LABEL && p[0].getKind()==kind::SEP_PTO );
       Assert( areEqual( pb[0][0], p[0][0] ) );
@@ -798,22 +796,25 @@ void TheorySep::addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity, i
   }else{
     if( polarity ){
       ei->d_pto.set( p );
-      validatePto( ei, ei_n, c_index );
+      validatePto( ei, ei_n );
     }else{
       ei->d_has_neg_pto.set( true );
     }
   }
 }
 
-void TheorySep::mergePto( Node p1, Node p2, int index ) {
-  Trace("sep-lemma-debug") << "Merge pto : " << p1 << " " << p2 << ", index = " << index << std::endl;
+void TheorySep::mergePto( Node p1, Node p2 ) {
+  Trace("sep-lemma-debug") << "Merge pto : " << p1 << " " << p2 << std::endl;
   Assert( p1.getKind()==kind::SEP_LABEL && p1[0].getKind()==kind::SEP_PTO );
   Assert( p2.getKind()==kind::SEP_LABEL && p2[0].getKind()==kind::SEP_PTO );
-  if( !areEqual( p1[0][index], p2[0][index] ) ){
+  if( !areEqual( p1[0][1], p2[0][1] ) ){
     std::vector< Node > exp;
+    if( p1[0][0]!=p2[0][0] ){
+      exp.push_back( p1[0][0].eqNode( p2[0][0] ) );
+    }
     exp.push_back( p1 );
     exp.push_back( p2 );
-    sendLemma( exp, p1[0][index].eqNode( p2[0][index] ), "PTO_PROP", true );
+    sendLemma( exp, p1[0][1].eqNode( p2[0][1] ), "PTO_PROP", true );
   }
 }
 

@@ -159,7 +159,7 @@ class TheorySep : public Theory {
 
     void eqNotifyNewClass(TNode t) { }
     void eqNotifyPreMerge(TNode t1, TNode t2) { d_sep.eqNotifyPreMerge( t1, t2 ); }
-    void eqNotifyPostMerge(TNode t1, TNode t2) { }
+    void eqNotifyPostMerge(TNode t1, TNode t2) { d_sep.eqNotifyPostMerge( t1, t2 ); }
     void eqNotifyDisequal(TNode t1, TNode t2, TNode reason) { }
   };
 
@@ -239,9 +239,9 @@ class TheorySep : public Theory {
 
   //bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
-  void validatePto( HeapAssertInfo * ei, Node ei_n, int c_index );
-  void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity, int c_index );
-  void mergePto( Node p1, Node p2, int index );
+  void validatePto( HeapAssertInfo * ei, Node ei_n );
+  void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity );
+  void mergePto( Node p1, Node p2 );
   void computeLabelModel( Node lbl );
 private:
   Node getRepresentative( Node t );

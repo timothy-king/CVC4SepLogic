@@ -576,6 +576,11 @@ void Smt2Printer::toStream(std::ostream& out, TNode n,
   case kind::APPLY_SELECTOR_TOTAL:
   case kind::PARAMETRIC_DATATYPE:
     break;
+    
+  //separation
+  case kind::SEP_PTO:
+  case kind::SEP_STAR:
+  case kind::REF_TYPE: out << smtKindString(k) << " "; break;
 
     // quantifiers
   case kind::FORALL:
@@ -823,6 +828,7 @@ static string smtKindString(Kind k) throw() {
   //sep theory
   case kind::SEP_STAR: return "sep";
   case kind::SEP_PTO: return "pto";
+  case kind::REF_TYPE: return "Ref";
   
   default:
     ; /* fall through */
