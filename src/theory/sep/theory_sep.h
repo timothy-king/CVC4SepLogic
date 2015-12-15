@@ -237,7 +237,7 @@ class TheorySep : public Theory {
     Node getValue( TypeNode tn );
   };
   //current assertions
-  std::map< Node, std::vector< Node > > d_heap_pos_assertions;
+  std::map< Node, std::vector< Node > > d_heap_active_assertions;
   std::map< Node, Node > d_heap_pos_pto;
   std::map< Node, HeapInfo > d_label_model;
 

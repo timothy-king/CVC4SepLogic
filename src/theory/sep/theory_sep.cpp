@@ -366,20 +366,32 @@ void TheorySep::check(Effort e) {
     Trace("sep-process") << "Checking heap at full effort..." << std::endl;
     d_label_model.clear();
     //build positive/negative assertion lists for labels
-    d_heap_pos_assertions.clear();
+    d_heap_active_assertions.clear();
     d_heap_pos_pto.clear();
     Trace("sep-process") << "--- Current spatial assertions : " << std::endl;
+    std::map< Node, bool > assert_active;
     for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
       Node fact = (*i);
       Trace("sep-process") << "  " << fact << std::endl;
       bool polarity = fact.getKind() != kind::NOT;
-      if( polarity ){
-        TNode atom = polarity ? fact : fact[0];
-        Assert( atom.getKind()==kind::SEP_LABEL );
-        TNode s_atom = atom[0];
-        TNode s_lbl = atom[1];
-        d_heap_pos_assertions[s_lbl].push_back( s_atom );
-        if( s_atom.getKind()==kind::SEP_PTO ){
+      TNode atom = polarity ? fact : fact[0];
+      Assert( atom.getKind()==kind::SEP_LABEL );
+      TNode s_atom = atom[0];
+      TNode s_lbl = atom[1];
+      //check whether assertion is active : either polarity=true, or guard is not asserted false
+      assert_active[fact] = true;
+      if( !polarity ){
+        Assert( d_neg_guard[s_lbl].find( s_atom )!=d_neg_guard[s_lbl].end() );
+        //check if the guard is asserted positively
+        Node guard = d_neg_guard[s_lbl][s_atom];
+        bool value;
+        if( getValuation().hasSatValue( guard, value ) ) {
+          assert_active[fact] = value;
+        }
+      }
+      if( assert_active[fact] ){
+        d_heap_active_assertions[s_lbl].push_back( s_atom );
+        if( polarity && s_atom.getKind()==kind::SEP_PTO ){
           d_heap_pos_pto[s_lbl] = s_atom;
         }
       }
@@ -409,19 +421,12 @@ void TheorySep::check(Effort e) {
         Node fact = (*i);
         bool polarity = fact.getKind() != kind::NOT;
         if( !polarity ){
-          TNode atom = polarity ? fact : fact[0];
-          Assert( atom.getKind()==kind::SEP_LABEL );
-          TNode s_atom = atom[0];
-          TNode s_lbl = atom[1];
-          Assert( d_neg_guard[s_lbl].find( s_atom )!=d_neg_guard[s_lbl].end() );
-          //check if the guard is asserted positively
-          Node guard = d_neg_guard[s_lbl][s_atom];
-          bool active = true;
-          bool value;
-          if( getValuation().hasSatValue( guard, value ) ) {
-            active = value;
-          }
-          if( active ){
+          Assert( assert_active.find( fact )!=assert_active.end() );
+          if( assert_active[fact] ){
+            TNode atom = polarity ? fact : fact[0];
+            Assert( atom.getKind()==kind::SEP_LABEL );
+            TNode s_atom = atom[0];
+            TNode s_lbl = atom[1];
             Trace("sep-process") << "--> Active negated atom : " << s_atom << ", lbl = " << s_lbl << std::endl;
             //add refinement lemma
             if( d_label_map.find( s_atom )!=d_label_map.end() ){
@@ -443,7 +448,7 @@ void TheorySep::check(Effort e) {
               for( std::map< int, Node >::iterator itl = d_label_map[s_atom].begin(); itl != d_label_map[s_atom].end(); ++itl ){
                 computeLabelModel( itl->second );
                 Node lbl_mval = d_label_model[itl->second].getValue( tn );
-                Trace("sep-process-debug") << "  child " << itl->first << " : " << itl->second << ", mval = " << lbl_mval << std::endl;
+                Trace("sep-process-debug") << "  child " << itl->first << " : " << itl->second << ", mval = " << lbl_mval << ", strict = " << d_label_model[itl->second].d_strict << std::endl;
                 //take difference from overall
                 for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs_r.size(); j++ ){
                   Node loc_r = d_label_model[itl->second].d_heap_locs_r[j];
@@ -679,8 +684,8 @@ void TheorySep::computeLabelModel( Node lbl ) {
       d_label_model[lbl].d_heap_locs_r.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, r ) );
       d_label_model[lbl].d_strict = true;
     }else{
-      std::map< Node, std::vector< Node > >::iterator ita = d_heap_pos_assertions.find( lbl );
-      if( ita!=d_heap_pos_assertions.end() ){
+      std::map< Node, std::vector< Node > >::iterator ita = d_heap_active_assertions.find( lbl );
+      if( ita!=d_heap_active_assertions.end() ){
         for( unsigned ia = 0; ia<ita->second.size(); ++ia ) {
           Node atom = ita->second[ia];
           Assert( atom.getKind()!=kind::SEP_LABEL );
