@@ -1971,6 +1971,9 @@ term[CVC4::Expr& expr, CVC4::Expr& expr2]
   | NILREF_TOK
     { expr = MK_CONST( ::CVC4::NilRef(Type())); }
 
+  | EMPSTAR_TOK
+    { std::vector< Expr > nvec; expr = MK_EXPR( CVC4::kind::EMP_STAR, nvec ); }
+    
     // NOTE: Theory constants go here
   ;
 
@@ -2709,6 +2712,7 @@ INST_CLOSURE_TOK : 'inst-closure';
 
 EMPTYSET_TOK: { PARSER_STATE->isTheoryEnabled(Smt2::THEORY_SETS) }? 'emptyset';
 
+EMPSTAR_TOK: { PARSER_STATE->isTheoryEnabled(Smt2::THEORY_SEP) }? 'emp';
 NILREF_TOK: { PARSER_STATE->isTheoryEnabled(Smt2::THEORY_SEP) }? 'sep.nil';
 // Other set theory operators are not
 // tokenized and handled directly when

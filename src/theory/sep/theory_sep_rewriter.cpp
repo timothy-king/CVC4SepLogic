@@ -39,7 +39,8 @@ void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& s_children
         to_add = NodeManager::currentNM()->mkConst( true );
       }else{
         //remove empty star
-        Node es = NodeManager::currentNM()->mkConst( EmpStar() );
+        std::vector< Node > no_children;
+        Node es = NodeManager::currentNM()->mkNode( kind::EMP_STAR, no_children );
         std::vector< Node >::iterator it = std::find( temp_s_children.begin(), temp_s_children.end(), es );
         if( it!=temp_s_children.end() ){
           temp_s_children.erase( it, it+1 );
@@ -110,7 +111,7 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
       }
       */
       if( node[0].getKind()==kind::EMP_STAR ){
-        node[1].eqNode( NodeManager::currentNM()->mkConst(EmptySet(node[1].getType().toType())) );
+        retNode = node[1].eqNode( NodeManager::currentNM()->mkConst(EmptySet(node[1].getType().toType())) );
       }
       break;
     }
@@ -124,7 +125,8 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
       getStarChildren( node, s_children, ns_children );
       Node schild;
       if( s_children.size()==0 ){
-        schild = NodeManager::currentNM()->mkConst( EmpStar() );
+        std::vector< Node > no_children;
+        schild = NodeManager::currentNM()->mkNode( kind::EMP_STAR, no_children );
       }else if( s_children.size()==1) {
         schild = s_children[0];
       }else{
@@ -159,7 +161,19 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
     Trace("sep-rewrite") << "Sep::rewrite : " << node << " -> " << retNode << std::endl;
   }
   return RewriteResponse(node==retNode ? REWRITE_DONE : REWRITE_AGAIN_FULL, retNode);
+}  
+
+/*
+RewriteResponse TheorySepRewriter::preRewrite(TNode node) {
+  if( node.getKind()==kind::EMP_STAR ){
+    Trace("sep-prerewrite") << "Sep::preRewrite emp star " << std::endl;
+    return RewriteResponse(REWRITE_DONE, NodeManager::currentNM()->mkNode( kind::EMP_STAR, NodeManager::currentNM()->mkConst( true ) ) );
+  }else{
+    Trace("sep-prerewrite") << "Sep::preRewrite returning " << node << std::endl;
+    return RewriteResponse(REWRITE_DONE, node);
+  }
 }
+*/
 
 }/* CVC4::theory::sep namespace */
 }/* CVC4::theory namespace */

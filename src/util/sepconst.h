@@ -23,7 +23,7 @@ namespace CVC4 {
   // messy; Expr needs NilRef (because it's the payload of a
   // CONSTANT-kinded expression), and NilRef needs Expr.
   class CVC4_PUBLIC NilRef;
-  class CVC4_PUBLIC EmpStar;
+  //class CVC4_PUBLIC EmpStar;
 }/* CVC4 namespace */
 
 #include "expr/expr.h"
@@ -74,13 +74,10 @@ struct CVC4_PUBLIC NilRefHashFunction {
 };/* struct NilRefHashFunction */
 
 
-
+/*
 class CVC4_PUBLIC EmpStar {
 
 public:
-  /**
-   * Constructs empty star.
-   */
   EmpStar() { }
 
   ~EmpStar() throw() {
@@ -103,7 +100,7 @@ public:
   bool operator>=(const EmpStar& es) const throw() {
     return !(*this < es);
   }
-};/* class EmpStar */
+};
 
 std::ostream& operator<<(std::ostream& out, const EmpStar& es) CVC4_PUBLIC;
 
@@ -111,6 +108,7 @@ struct CVC4_PUBLIC EmpStarHashFunction {
   inline size_t operator()(const EmpStar& es) const {
     return 0;
   }
-};/* struct EmpStarHashFunction */
+};
+*/
 
 }/* CVC4 namespace */

@@ -17,12 +17,6 @@ constant NIL_REF \
     "util/sepconst.h" \
     "the nil reference constant; payload is an instance of the CVC4::NilRef class"
     
-constant EMP_STAR \
-    ::CVC4::EmpStar \
-    ::CVC4::EmpStarHashFunction \
-    "util/sepconst.h" \
-    "the empty star constant; payload is an instance of the CVC4::EmpStar class"
-    
 rewriter ::CVC4::theory::sep::TheorySepRewriter "theory/sep/theory_sep_rewriter.h"
 
 operator REF_TYPE 1 "array type"
@@ -38,6 +32,7 @@ enumerator REF_TYPE \
     "::CVC4::theory::sep::RefEnumerator" \
     "theory/sep/type_enumerator.h"
 
+operator EMP_STAR 0 "separation empty heap"
 operator SEP_PTO 2 "points to relation"
 operator SEP_STAR 2: "separation star"
 operator SEP_LABEL 2 "separation label"

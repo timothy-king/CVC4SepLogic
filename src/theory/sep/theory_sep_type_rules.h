@@ -38,10 +38,7 @@ public:
   inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
     throw (TypeCheckingExceptionPrivate, AssertionException) {
     return nodeManager->booleanType();
-  }
-  inline static bool computeIsConst(NodeManager* nodeManager, TNode n) {
-    return false;
-  }
+  }  
 };
   
 struct SepPtoTypeRule {
@@ -78,6 +75,15 @@ struct SepStarTypeRule {
     return btype;
   }
 };/* struct SepStarTypeRule */
+
+
+class EmpStarInternalTypeRule {
+public:
+  inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
+    throw (TypeCheckingExceptionPrivate, AssertionException) {
+    return nodeManager->booleanType();
+  }
+};/* struct EmpStarInternalTypeRule */
 
 struct SepLabelTypeRule {
   inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
