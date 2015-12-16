@@ -580,8 +580,8 @@ void Smt2Printer::toStream(std::ostream& out, TNode n,
   //separation
   case kind::SEP_PTO:
   case kind::SEP_STAR:
-  case kind::REF_TYPE:
-  case kind::EMP_STAR:out << smtKindString(k) << " "; break;
+  case kind::REF_TYPE:out << smtKindString(k) << " "; break;
+  case kind::EMP_STAR:out << smtKindString(k); break;
 
     // quantifiers
   case kind::FORALL:

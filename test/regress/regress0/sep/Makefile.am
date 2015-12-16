@@ -29,7 +29,8 @@ TESTS =	\
   sep-neg-nstrict.smt2 \
   sep-plus1.smt2 \
   sep-nterm-val-model.smt2 \
-  split-find-unsat.smt2
+  split-find-unsat.smt2 \
+  split-find-unsat-w-emp.smt2
 
 
 FAILING_TESTS =

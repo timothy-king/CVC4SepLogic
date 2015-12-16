@@ -528,7 +528,7 @@ void TheorySep::check(Effort e) {
                   //add to mvals
                   for( unsigned j=0; j<loc_to_nstrict.size(); j++ ){
                     Trace("sep-process") << "    -> Add " << locs[j] << " to child #" << nstrict_children[loc_to_nstrict[j]] << std::endl;
-                    mvals[nstrict_children[loc_to_nstrict[j]]] = NodeManager::currentNM()->mkNode( kind::UNION, mvals[nstrict_children[loc_to_nstrict[j]]], locs[j] );
+                    mvals[nstrict_children[loc_to_nstrict[j]]] = mvals[nstrict_children[loc_to_nstrict[j]]].getKind()==kind::EMPTYSET ? locs[j] : NodeManager::currentNM()->mkNode( kind::UNION, mvals[nstrict_children[loc_to_nstrict[j]]], locs[j] );
                   }
                 }
               }else{

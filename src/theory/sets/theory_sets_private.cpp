@@ -554,12 +554,12 @@ void TheorySetsPrivate::computeCareGraph() {
         if(Trace.isOn("sharing")) {
           ++edgesAddedCnt;
         }
-	if(Debug.isOn("sets-care")) {
-	  Debug("sets-care") << "[sets-care] Requesting split between" << a << " and "
-			     << b << "." << std::endl << "[sets-care] "
-			     << "  Both current have value "
-			     << d_external.d_valuation.getModelValue(a) << std::endl;
-	}
+        if(Debug.isOn("sets-care")) {
+          Debug("sets-care") << "[sets-care] Requesting split between" << a << " and "
+                << b << "." << std::endl << "[sets-care] "
+                << "  Both current have value "
+                << d_external.d_valuation.getModelValue(a) << std::endl;
+        }
       case EQUALITY_FALSE_IN_MODEL:
         if(Trace.isOn("sets-care-performance-test")) {
           // TODO: delete these lines, only for performance testing for now
@@ -576,7 +576,7 @@ void TheorySetsPrivate::computeCareGraph() {
         }
         break;
       default:
-	Unreachable();
+        Unreachable();
       }
     }
   }
@@ -593,11 +593,16 @@ EqualityStatus TheorySetsPrivate::getEqualityStatus(TNode a, TNode b) {
     // The terms are implied to be dis-equal
     return EQUALITY_FALSE;
   }
-  if( d_external.d_valuation.getModelValue(a) == d_external.d_valuation.getModelValue(b) ) {
-    // Ther term are true in current model
+  Node aModelValue = d_external.d_valuation.getModelValue(a);
+  if(aModelValue.isNull()) { return EQUALITY_UNKNOWN; }
+  Node bModelValue = d_external.d_valuation.getModelValue(b);
+  if(bModelValue.isNull()) { return EQUALITY_UNKNOWN; }
+  if( aModelValue == bModelValue ) {
+    // The term are true in current model
     return EQUALITY_TRUE_IN_MODEL;
+  } else {
+    return EQUALITY_FALSE_IN_MODEL;
   }
-  return EQUALITY_FALSE_IN_MODEL;
   // }
   // //TODO: can we be more precise sometimes?
   // return EQUALITY_UNKNOWN;
@@ -716,10 +721,10 @@ bool TheorySetsPrivate::checkModel(const SettermElementsMap& settermElementsMap,
       Debug("sets-model") << "[sets-model] *** ERROR *** cur != saved "
                           << std::endl;
       Debug("sets-model")
-	<< "[sets-model]   FYI: "
-	<< "  [" << S << "] = " << d_equalityEngine.getRepresentative(S) << ", "
-	<< "  [" << S[0] << "] = " << d_equalityEngine.getRepresentative(S[0]) << ", "
-	<< "  [" << S[1] << "] = " << d_equalityEngine.getRepresentative(S[1]) << "\n";
+      << "[sets-model]   FYI: "
+      << "  [" << S << "] = " << d_equalityEngine.getRepresentative(S) << ", "
+      << "  [" << S[0] << "] = " << d_equalityEngine.getRepresentative(S[0]) << ", "
+      << "  [" << S[1] << "] = " << d_equalityEngine.getRepresentative(S[1]) << "\n";
 
       return false;
     }
@@ -998,7 +1003,7 @@ void TheorySetsPrivate::addToPending(Node n) {
 
   if(d_pendingEverInserted.find(n) != d_pendingEverInserted.end()) {
     Debug("sets-pending") << "[sets-pending] \u2514 skipping " << n
-			  << " as lemma already generated." << std::endl;
+        << " as lemma already generated." << std::endl;
     return;
   }
 
@@ -1008,7 +1013,7 @@ void TheorySetsPrivate::addToPending(Node n) {
 
     if(nRewritten.isConst()) {
       Debug("sets-pending") << "[sets-pending] \u2514 skipping " << n
-			    << " as we can learn one of the sides." << std::endl;
+          << " as we can learn one of the sides." << std::endl;
       Assert(nRewritten == d_trueNode || nRewritten == d_falseNode);
 
       bool polarity = (nRewritten == d_trueNode);
@@ -1017,7 +1022,7 @@ void TheorySetsPrivate::addToPending(Node n) {
     }
 
     Debug("sets-pending") << "[sets-pending] \u2514 added to member queue"
-			  << std::endl;
+        << std::endl;
     ++d_statistics.d_memberLemmas;
     d_pending.push(n);
     d_external.d_out->splitLemma(getLemma());
@@ -1026,7 +1031,7 @@ void TheorySetsPrivate::addToPending(Node n) {
   } else {
 
     Debug("sets-pending") << "[sets-pending] \u2514 added to equality queue"
-			  << std::endl;
+        << std::endl;
     Assert(n.getKind() == kind::EQUAL);
     ++d_statistics.d_disequalityLemmas;
     d_pendingDisequal.push(n);
@@ -1487,7 +1492,7 @@ void TheorySetsPrivate::TermInfoManager::pushToSettermPropagationQueue
                        << std::endl;
 
     d_eqEngine->addTerm(MEMBER(d_eqEngine->getRepresentative(x),
-			       d_eqEngine->getRepresentative(S)));
+             d_eqEngine->getRepresentative(S)));
 
     for(eq::EqClassIterator j(d_eqEngine->getRepresentative(S), d_eqEngine);
         !j.isFinished(); ++j) {
@@ -1561,7 +1566,9 @@ Node TheorySetsPrivate::TermInfoManager::getModelValue(TNode n)
     if(e.isConst()) {
       elements_const.insert(e);
     } else {
-      elements_const.insert(d_theory.d_external.d_valuation.getModelValue(e));
+      Node eModelValue = d_theory.d_external.d_valuation.getModelValue(e);
+      if( eModelValue.isNull() ) return eModelValue;
+      elements_const.insert(eModelValue);
     }
   }
   Node v = d_theory.elementsToShape(elements_const, n.getType());
