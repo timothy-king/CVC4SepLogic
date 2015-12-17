@@ -1,5 +1,5 @@
 (set-logic ALL_SUPPORTED)
-(set-info :status unsat)
+(set-info :status sat)
 
 (declare-const x (Ref Int))
 (declare-const y (Ref Int))
