@@ -385,7 +385,7 @@ void TheoryEngine::check(Theory::Effort effort) {
           printAssertions("theory::assertions::fulleffort");
         }
       }
-        
+
       // Note that we've discharged all the facts
       d_factsAsserted = false;
 
@@ -413,16 +413,22 @@ void TheoryEngine::check(Theory::Effort effort) {
 
     // Must consult quantifiers theory for last call to ensure sat, or otherwise add a lemma
     if( effort == Theory::EFFORT_FULL && ! d_inConflict && ! needCheck() ) {
-      //d_theoryTable[THEORY_STRINGS]->check(Theory::EFFORT_LAST_CALL);
-      if(d_logicInfo.isQuantified()) {
-        // quantifiers engine must pass effort last call check
-        d_quantEngine->check(Theory::EFFORT_LAST_CALL);
-        // if returning incomplete or SAT, we have ensured that the model in the quantifiers engine has been built
-      } else if(options::produceModels()) {
+      if( d_theoryTable[THEORY_SEP]!=NULL ){
         // must build model at this point
-        d_curr_model_builder->buildModel(d_curr_model, true);
+        d_curr_model_builder->buildModel(d_curr_model, false);
+        d_theoryTable[THEORY_SEP]->check(Theory::EFFORT_LAST_CALL);
       }
-	  Trace("theory::assertions-model") << endl;
+      if( ! d_inConflict && ! needCheck() ){
+        if(d_logicInfo.isQuantified()) {
+          // quantifiers engine must pass effort last call check
+          d_quantEngine->check(Theory::EFFORT_LAST_CALL);
+          // if returning incomplete or SAT, we have ensured that the model in the quantifiers engine has been built
+        } else if(options::produceModels()) {
+          // must build model at this point
+          d_curr_model_builder->buildModel(d_curr_model, true);
+        }
+      }
+    Trace("theory::assertions-model") << endl;
       if (Trace.isOn("theory::assertions-model")) {
         printAssertions("theory::assertions-model");
       }
@@ -1491,27 +1497,27 @@ void TheoryEngine::staticInitializeBVOptions(const std::vector<Node>& assertions
     if (options::produceModels())
       throw ModalException("Slicer does not currently support model generation. Use --bv-eq-slicer=off");
     useSlicer = true;
-    
+
   } else if (options::bitvectorEqualitySlicer() == bv::BITVECTOR_SLICER_OFF) {
     return;
-    
+
   } else if (options::bitvectorEqualitySlicer() == bv::BITVECTOR_SLICER_AUTO) {
     if (options::incrementalSolving() ||
         options::produceModels())
       return;
 
-    useSlicer = true; 
+    useSlicer = true;
     bv::utils::TNodeBoolMap cache;
     for (unsigned i = 0; i < assertions.size(); ++i) {
-      useSlicer = useSlicer && bv::utils::isCoreTerm(assertions[i], cache); 
+      useSlicer = useSlicer && bv::utils::isCoreTerm(assertions[i], cache);
     }
   }
-  
+
   if (useSlicer) {
-    bv::TheoryBV* bv_theory = (bv::TheoryBV*)d_theoryTable[THEORY_BV]; 
+    bv::TheoryBV* bv_theory = (bv::TheoryBV*)d_theoryTable[THEORY_BV];
     bv_theory->enableCoreTheorySlicer();
   }
-  
+
 }
 
 void TheoryEngine::ppBvToBool(const std::vector<Node>& assertions, std::vector<Node>& new_assertions) {
@@ -1519,12 +1525,12 @@ void TheoryEngine::ppBvToBool(const std::vector<Node>& assertions, std::vector<N
 }
 
 bool  TheoryEngine::ppBvAbstraction(const std::vector<Node>& assertions, std::vector<Node>& new_assertions) {
-  bv::TheoryBV* bv_theory = (bv::TheoryBV*)d_theoryTable[THEORY_BV]; 
-  return bv_theory->applyAbstraction(assertions, new_assertions); 
+  bv::TheoryBV* bv_theory = (bv::TheoryBV*)d_theoryTable[THEORY_BV];
+  return bv_theory->applyAbstraction(assertions, new_assertions);
 }
 
 void TheoryEngine::mkAckermanizationAsssertions(std::vector<Node>& assertions) {
-  bv::TheoryBV* bv_theory = (bv::TheoryBV*)d_theoryTable[THEORY_BV]; 
+  bv::TheoryBV* bv_theory = (bv::TheoryBV*)d_theoryTable[THEORY_BV];
   bv_theory->mkAckermanizationAsssertions(assertions);
 }
 

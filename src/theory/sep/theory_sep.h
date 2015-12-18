@@ -29,6 +29,9 @@
 
 namespace CVC4 {
 namespace theory {
+
+class TheoryModel;
+
 namespace sep {
 
 class TheorySep : public Theory {
@@ -233,6 +236,7 @@ class TheorySep : public Theory {
     //std::vector< Node > d_strict_exp;
     std::vector< Node > d_heap_locs;
     std::vector< Node > d_heap_locs_r;
+    std::vector< Node > d_heap_locs_model;
     //get value
     Node getValue( TypeNode tn );
   };
@@ -240,7 +244,7 @@ class TheorySep : public Theory {
   std::map< Node, std::vector< Node > > d_heap_active_assertions;
   std::map< Node, Node > d_heap_pos_pto;
   std::map< Node, HeapInfo > d_label_model;
-  
+
   //negated instantiation trie
   class InstTrie {
   private:
@@ -260,6 +264,10 @@ class TheorySep : public Theory {
   void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity );
   void mergePto( Node p1, Node p2 );
   void computeLabelModel( Node lbl );
+  void addHeapLocToLabel( Node lbl, Node atom, Node loc, Node loc_r );
+
+  //hack FIXME
+  TheoryModel* d_last_model;
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );
