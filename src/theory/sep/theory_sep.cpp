@@ -893,11 +893,13 @@ void TheorySep::eqNotifyPostMerge(TNode t1, TNode t2) {
   HeapAssertInfo * e2 = getOrMakeEqcInfo( t2, false );
   if( e2 && ( !e2->d_pto.get().isNull() || e2->d_has_neg_pto.get() ) ){
     HeapAssertInfo * e1 = getOrMakeEqcInfo( t1, true );
-    if( !e1->d_pto.get().isNull() ){
-      Trace("sep-pto-debug") << "While merging " << t1 << " " << t2 << ", merge pto." << std::endl;
-      mergePto( e1->d_pto.get(), e2->d_pto.get() );
-    }else{
-      e1->d_pto.set( e2->d_pto.get() );
+    if( !e2->d_pto.get().isNull() ){
+      if( !e1->d_pto.get().isNull() ){
+        Trace("sep-pto-debug") << "While merging " << t1 << " " << t2 << ", merge pto." << std::endl;
+        mergePto( e1->d_pto.get(), e2->d_pto.get() );
+      }else{
+        e1->d_pto.set( e2->d_pto.get() );
+      }
     }
     e1->d_has_neg_pto.set( e1->d_has_neg_pto.get() || e2->d_has_neg_pto.get() );
     //validate
