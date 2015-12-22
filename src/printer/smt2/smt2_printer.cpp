@@ -309,8 +309,8 @@ void Smt2Printer::toStream(std::ostream& out, TNode n,
     }
     if(n.getNumChildren() != 0) {
       for(unsigned i = 0; i < n.getNumChildren(); ++i) {
-	out << ' ';
-	toStream(out, n[i], toDepth, types);
+  out << ' ';
+  toStream(out, n[i], toDepth, types);
       }
       out << ')';
     }
@@ -576,10 +576,11 @@ void Smt2Printer::toStream(std::ostream& out, TNode n,
   case kind::APPLY_SELECTOR_TOTAL:
   case kind::PARAMETRIC_DATATYPE:
     break;
-    
+
   //separation
   case kind::SEP_PTO:
   case kind::SEP_STAR:
+  case kind::SEP_WAND:
   case kind::REF_TYPE:out << smtKindString(k) << " "; break;
   case kind::EMP_STAR:out << smtKindString(k); break;
 
@@ -829,9 +830,10 @@ static string smtKindString(Kind k) throw() {
   //sep theory
   case kind::SEP_STAR: return "sep";
   case kind::SEP_PTO: return "pto";
+  case kind::SEP_WAND: return "wand";
   case kind::REF_TYPE: return "Ref";
   case kind::EMP_STAR: return "emp";
-  
+
   default:
     ; /* fall through */
   }

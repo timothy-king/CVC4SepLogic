@@ -494,7 +494,7 @@ Node BooleanTermConverter::rewriteBooleanTermsRec(TNode top, theory::TheoryId pa
         goto next_worklist;
       }
 
-      if(parentTheory != theory::THEORY_BOOL && top.getType().isBoolean() && top.getKind()!=kind::SEP_STAR) {
+      if(parentTheory != theory::THEORY_BOOL && top.getType().isBoolean() && top.getKind()!=kind::SEP_STAR && top.getKind()!=kind::SEP_WAND) {
         // still need to rewrite e.g. function applications over boolean
         Node topRewritten = rewriteBooleanTermsRec(top, theory::THEORY_BOOL, quantBoolVars);
         Node n;
@@ -736,7 +736,7 @@ Node BooleanTermConverter::rewriteBooleanTermsRec(TNode top, theory::TheoryId pa
             goto next_worklist;
           }
         } else if(!t.isSort() && t.getNumChildren() > 0) {
-          if( t.getKind()!=kind::SEP_STAR ){
+          if( t.getKind()!=kind::SEP_STAR && t.getKind()!=kind::SEP_WAND ){
             for(TypeNode::iterator i = t.begin(); i != t.end(); ++i) {
               if((*i).isBoolean() ) {
                 vector<TypeNode> argTypes(t.begin(), t.end());
@@ -771,6 +771,7 @@ Node BooleanTermConverter::rewriteBooleanTermsRec(TNode top, theory::TheoryId pa
       case kind::RR_DEDUCTION:
       case kind::RR_REDUCTION:
       case kind::SEP_STAR:
+      case kind::SEP_WAND:
         // not yet supported
         result.top() << top;
         worklist.pop();

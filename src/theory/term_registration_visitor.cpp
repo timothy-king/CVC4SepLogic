@@ -38,6 +38,7 @@ bool PreRegisterVisitor::alreadyVisited(TNode current, TNode parent) {
         parent.getKind() == kind::EXISTS ||
         parent.getKind() == kind::REWRITE_RULE ||
         parent.getKind() == kind::SEP_STAR ||
+        parent.getKind() == kind::SEP_WAND ||
         ( parent.getKind() == kind::SEP_LABEL && current.getType().isBoolean() )
         //parent.getKind() == kind::CARDINALITY_CONSTRAINT
       ) &&
@@ -78,7 +79,7 @@ bool PreRegisterVisitor::alreadyVisited(TNode current, TNode parent) {
       }
     }
   }
-  
+
   // Get the theories that have already visited this node
   TNodeToTheorySetMap::iterator find = d_visited.find(current);
   if (find == d_visited.end()) {
@@ -144,7 +145,7 @@ void PreRegisterVisitor::visit(TNode current, TNode parent) {
       }
     }
   }
-  
+
   Theory::Set visitedTheories = d_visited[current];
   Debug("register::internal") << "PreRegisterVisitor::visit(" << current << "," << parent << "): previously registered with " << Theory::setToString(visitedTheories) << std::endl;
   if (!Theory::setContains(currentTheoryId, visitedTheories)) {
@@ -193,8 +194,9 @@ bool SharedTermsVisitor::alreadyVisited(TNode current, TNode parent) const {
         parent.getKind() == kind::EXISTS ||
         parent.getKind() == kind::REWRITE_RULE ||
         parent.getKind() == kind::SEP_STAR ||
+        parent.getKind() == kind::SEP_WAND ||
         ( parent.getKind() == kind::SEP_LABEL && current.getType().isBoolean() )
-        //parent.getKind() == kind::CARDINALITY_CONSTRAINT 
+        //parent.getKind() == kind::CARDINALITY_CONSTRAINT
       ) &&
       current != parent ) {
     Debug("register::internal") << "quantifier:true" << std::endl;

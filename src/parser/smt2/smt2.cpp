@@ -164,9 +164,11 @@ void Smt2::addFloatingPointOperators() {
 void Smt2::addSepOperators() {
   addOperator(kind::SEP_STAR, "sep");
   addOperator(kind::SEP_PTO, "pto");
+  addOperator(kind::SEP_WAND, "wand");
   //addOperator(kind::EMP_STAR, "emp");
   Parser::addOperator(kind::SEP_STAR);
   Parser::addOperator(kind::SEP_PTO);
+  Parser::addOperator(kind::SEP_WAND);
   //Parser::addOperator(kind::EMP_STAR);
 }
 
@@ -260,7 +262,7 @@ void Smt2::addTheory(Theory theory) {
   case THEORY_SEP:
     addSepOperators();
     break;
-    
+
   default:
     std::stringstream ss;
     ss << "internal error: unsupported theory " << theory;
@@ -418,7 +420,7 @@ void Smt2::setLogic(std::string name) {
   if (d_logic.isTheoryEnabled(theory::THEORY_FP)) {
     addTheory(THEORY_FP);
   }
-  
+
   if(d_logic.isTheoryEnabled(theory::THEORY_SEP)) {
     addTheory(THEORY_SEP);
   }

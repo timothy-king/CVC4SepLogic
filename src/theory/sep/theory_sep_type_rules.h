@@ -32,15 +32,15 @@ public:
     return TypeNode::fromType( n.getConst<NilRef>().getType() );
   }
 };
-  
+
 class EmpStarTypeRule {
 public:
   inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
     throw (TypeCheckingExceptionPrivate, AssertionException) {
     return nodeManager->booleanType();
-  }  
+  }
 };
-  
+
 struct SepPtoTypeRule {
   inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
     throw (TypeCheckingExceptionPrivate, AssertionException) {
@@ -76,6 +76,22 @@ struct SepStarTypeRule {
   }
 };/* struct SepStarTypeRule */
 
+struct SepWandTypeRule {
+  inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
+    throw (TypeCheckingExceptionPrivate, AssertionException) {
+    TypeNode btype = nodeManager->booleanType();
+    Assert(n.getKind() == kind::SEP_WAND);
+    if( check ){
+      for( unsigned i=0; i<n.getNumChildren(); i++ ){
+        TypeNode ctype = n[i].getType( check );
+        if( ctype!=btype ){
+          throw TypeCheckingExceptionPrivate(n, "child of sep magic wand is not Boolean");
+        }
+      }
+    }
+    return btype;
+  }
+};/* struct SepWandTypeRule */
 
 class EmpStarInternalTypeRule {
 public:

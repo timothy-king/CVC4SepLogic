@@ -248,7 +248,7 @@ void TheorySep::check(Effort e) {
     TNode atom = polarity ? fact : fact[0];
     TNode s_atom = atom.getKind()==kind::SEP_LABEL ? atom[0] : atom;
     TNode s_lbl = atom.getKind()==kind::SEP_LABEL ? atom[1] : TNode::null();
-    bool is_spatial = s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_PTO || s_atom.getKind()==kind::EMP_STAR;
+    bool is_spatial = s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND || s_atom.getKind()==kind::SEP_PTO || s_atom.getKind()==kind::EMP_STAR;
     if( is_spatial && s_lbl.isNull() ){
       if( d_reduce.find( fact )==d_reduce.end() ){
         Trace("sep-lemma-debug") << "Reducing unlabelled assertion " << atom << std::endl;
@@ -301,6 +301,8 @@ void TheorySep::check(Effort e) {
                 }
               }
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
+            }else if( s_atom.getKind()==kind::SEP_WAND ){
+              //TODO
             }else if( s_atom.getKind()==kind::SEP_PTO ){
               conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );
             }else{
@@ -696,7 +698,7 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
 
 Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) {
   Assert( n.getKind()!=kind::SEP_LABEL );
-  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_PTO || n.getKind()==kind::EMP_STAR ){
+  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND || n.getKind()==kind::SEP_PTO || n.getKind()==kind::EMP_STAR ){
     return NodeManager::currentNM()->mkNode( kind::SEP_LABEL, n, lbl );
   }else if( !n.getType().isBoolean() || n.getNumChildren()==0 ){
     return n;
@@ -772,6 +774,7 @@ void TheorySep::computeLabelModel( Node lbl ) {
           Node atom = ita->second[ia];
           Trace("sep-process-model-debug") << "  atom for label " << lbl << " : " << atom << std::endl;
           Assert( atom.getKind()!=kind::SEP_LABEL );
+          // atom.getKind()==kind::SEP_WAND   TODO
           if( atom.getKind()==kind::SEP_STAR ){
             //compute model for each child, take union, which is guarenteed to be disjoint
             bool isStrict = true;
@@ -830,6 +833,7 @@ void TheorySep::computeLabelModel( Node lbl ) {
 void TheorySep::addHeapLocToLabel( Node lbl, Node atom, Node loc, Node loc_r ) {
   Assert( d_label_model.find( lbl )!=d_label_model.end() );
   Trace("sep-process-model-debug") << "Sep:Model : Add location " << loc << ", r=" << loc_r << ", to atom " << atom << " with label " << lbl << std::endl;
+  // atom.getKind()==kind::SEP_WAND
   if( atom.getKind()==kind::SEP_STAR ){
     //if it is in the label model of a child, recurse
     for( std::map< int, Node >::iterator itl = d_label_map[atom].begin(); itl != d_label_map[atom].end(); ++itl ){
