@@ -327,7 +327,8 @@ void TheorySep::check(Effort e) {
           }else{
             conc = its->second;
           }
-          if( s_atom.getKind()==kind::SEP_WAND ? polarity : !polarity ){
+          bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
+          if( !use_polarity ){
             // introduce guard, assert positive version
             Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
             d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
@@ -341,7 +342,7 @@ void TheorySep::check(Effort e) {
           }else{
             //reduce based on implication
             Node ant = atom;
-            if( s_atom.getKind()!=kind::SEP_WAND ){
+            if( polarity ){
               ant = atom.negate();
             }
             Node lem = NodeManager::currentNM()->mkNode( kind::OR, ant, conc );
@@ -385,8 +386,6 @@ void TheorySep::check(Effort e) {
     Trace("sep-process") << "Checking heap at full effort..." << std::endl;
     d_label_model.clear();
     //build positive/negative assertion lists for labels
-    d_heap_active_assertions.clear();
-    d_heap_pos_pto.clear();
     Trace("sep-process") << "--- Current spatial assertions : " << std::endl;
     std::map< Node, bool > assert_active;
     for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
@@ -399,7 +398,8 @@ void TheorySep::check(Effort e) {
       TNode s_lbl = atom[1];
       //check whether assertion is active : either polarity=true, or guard is not asserted false
       assert_active[fact] = true;
-      if( !polarity ){
+      bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
+      if( !use_polarity ){
         Assert( d_neg_guard[s_lbl].find( s_atom )!=d_neg_guard[s_lbl].end() );
         //check if the guard is asserted positively
         Node guard = d_neg_guard[s_lbl][s_atom];
@@ -409,9 +409,16 @@ void TheorySep::check(Effort e) {
         }
       }
       if( assert_active[fact] ){
-        d_heap_active_assertions[s_lbl].push_back( s_atom );
-        if( polarity && s_atom.getKind()==kind::SEP_PTO ){
-          d_heap_pos_pto[s_lbl] = s_atom;
+        if( s_atom.getKind()==kind::SEP_WAND ){
+          // add to right hand side label, add to wand of full label
+          d_label_model[s_lbl].d_heap_active_wassertions.push_back( s_atom );
+          Node base_lbl = getLabel( s_atom, 1, s_lbl );
+          d_label_model[base_lbl].d_heap_active_assertions.push_back( s_atom );
+        }else{
+          d_label_model[s_lbl].d_heap_active_assertions.push_back( s_atom );
+          if( polarity && s_atom.getKind()==kind::SEP_PTO ){
+            d_label_model[s_lbl].d_heap_pos_pto = s_atom;
+          }
         }
       }else{
         Trace("sep-process") << " [inactive]";
@@ -759,7 +766,9 @@ void TheorySep::getLabelChildren( Node atom, Node lbl, std::vector< Node >& chil
 }
 
 void TheorySep::computeLabelModel( Node lbl ) {
-  if( d_label_model.find( lbl )==d_label_model.end() ){
+  if( !d_label_model[lbl].d_computed ){
+    d_label_model[lbl].d_computed = true;
+
     //Node v_val = d_valuation.getModelValue( s_lbl );
     //hack FIXME
     Node v_val = d_last_model->getRepresentative( lbl );
@@ -775,9 +784,8 @@ void TheorySep::computeLabelModel( Node lbl ) {
     }
 
     d_label_model[lbl].d_strict = false;
-    std::map< Node, Node >::iterator itap = d_heap_pos_pto.find( lbl );
-    if( itap!=d_heap_pos_pto.end() ){
-      Node atom = itap->second;
+    if( !d_label_model[lbl].d_heap_pos_pto.isNull() ){
+      Node atom = d_label_model[lbl].d_heap_pos_pto;
       //d_label_model[lbl].d_heap[atom[0]].d_val = atom[1];
       //Node r = getRepresentative( atom[0] );
       Node r = d_last_model->getRepresentative( atom[0] );
@@ -786,56 +794,51 @@ void TheorySep::computeLabelModel( Node lbl ) {
       d_label_model[lbl].d_heap_locs_r.push_back( NodeManager::currentNM()->mkNode( kind::SINGLETON, r ) );
       d_label_model[lbl].d_strict = true;
     }else{
-      std::map< Node, std::vector< Node > >::iterator ita = d_heap_active_assertions.find( lbl );
-      if( ita!=d_heap_active_assertions.end() ){
-        for( unsigned ia = 0; ia<ita->second.size(); ++ia ) {
-          Node atom = ita->second[ia];
-          Trace("sep-process-model-debug") << "  atom for label " << lbl << " : " << atom << std::endl;
-          Assert( atom.getKind()!=kind::SEP_LABEL );
-          // atom.getKind()==kind::SEP_WAND   TODO
-          if( atom.getKind()==kind::SEP_STAR ){
-            //compute model for each child, take union, which is guarenteed to be disjoint
-            bool isStrict = true;
-            //store the current locations
-            std::map< Node, Node > curr_locs;
-            for( unsigned j=0; j<d_label_model[lbl].d_heap_locs_r.size(); j++ ){
-              curr_locs[d_label_model[lbl].d_heap_locs_r[j]] = d_label_model[lbl].d_heap_locs[j];
-            }
-            std::vector< Node > new_locs;
-            std::vector< Node > new_locs_r;
-            for( std::map< int, Node >::iterator itl = d_label_map[atom].begin(); itl != d_label_map[atom].end(); ++itl ){
-              Trace("sep-process-model-debug") << "  child " << itl->first << " of atom " << atom << " : " << itl->second << std::endl;
-              computeLabelModel( itl->second );
-              for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs_r.size(); j++ ){
-                Node loc = d_label_model[itl->second].d_heap_locs[j];
-                Node loc_r = d_label_model[itl->second].d_heap_locs_r[j];
-                if( std::find( d_label_model[lbl].d_heap_locs_r.begin(), d_label_model[lbl].d_heap_locs_r.end(), loc_r )==d_label_model[lbl].d_heap_locs_r.end() ){
-                  new_locs.push_back( loc );
-                  new_locs_r.push_back( loc_r );
-                  d_label_model[lbl].d_heap_locs.push_back( loc );
-                  d_label_model[lbl].d_heap_locs_r.push_back( loc_r );
-                }else{
-                  Assert( curr_locs.find( loc_r )!=curr_locs.end() );
-                  curr_locs.erase( loc_r );
-                }
-              }
-              isStrict = isStrict && d_label_model[itl->second].d_strict;
-            }
-            //add existing heap locations to this atom
-            for( std::map< Node, Node >::iterator itcl = curr_locs.begin(); itcl != curr_locs.end(); ++itcl ){
-              addHeapLocToLabel( lbl, atom, itcl->second, itcl->first );
-            }
-            //add new heap locations to other atoms
-            for( unsigned k=0; k<ia; k++ ){
-              for( unsigned j=0; j<new_locs.size(); j++ ){
-                addHeapLocToLabel( lbl, ita->second[k], new_locs[j], new_locs_r[j] );
-              }
-            }
-            d_label_model[lbl].d_strict = d_label_model[lbl].d_strict || isStrict;
+      for( unsigned ia = 0; ia<d_label_model[lbl].d_heap_active_assertions.size(); ++ia ) {
+        Node atom = d_label_model[lbl].d_heap_active_assertions[ia];
+        Trace("sep-process-model-debug") << "  atom for label " << lbl << " : " << atom << std::endl;
+        Assert( atom.getKind()!=kind::SEP_LABEL );
+        // atom.getKind()==kind::SEP_WAND   TODO
+        if( atom.getKind()==kind::SEP_STAR ){
+          //compute model for each child, take union, which is guarenteed to be disjoint
+          bool isStrict = true;
+          //store the current locations
+          std::map< Node, Node > curr_locs;
+          for( unsigned j=0; j<d_label_model[lbl].d_heap_locs_r.size(); j++ ){
+            curr_locs[d_label_model[lbl].d_heap_locs_r[j]] = d_label_model[lbl].d_heap_locs[j];
           }
+          std::vector< Node > new_locs;
+          std::vector< Node > new_locs_r;
+          for( std::map< int, Node >::iterator itl = d_label_map[atom].begin(); itl != d_label_map[atom].end(); ++itl ){
+            Trace("sep-process-model-debug") << "  child " << itl->first << " of atom " << atom << " : " << itl->second << std::endl;
+            computeLabelModel( itl->second );
+            for( unsigned j=0; j<d_label_model[itl->second].d_heap_locs_r.size(); j++ ){
+              Node loc = d_label_model[itl->second].d_heap_locs[j];
+              Node loc_r = d_label_model[itl->second].d_heap_locs_r[j];
+              if( std::find( d_label_model[lbl].d_heap_locs_r.begin(), d_label_model[lbl].d_heap_locs_r.end(), loc_r )==d_label_model[lbl].d_heap_locs_r.end() ){
+                new_locs.push_back( loc );
+                new_locs_r.push_back( loc_r );
+                d_label_model[lbl].d_heap_locs.push_back( loc );
+                d_label_model[lbl].d_heap_locs_r.push_back( loc_r );
+              }else{
+                Assert( curr_locs.find( loc_r )!=curr_locs.end() );
+                curr_locs.erase( loc_r );
+              }
+            }
+            isStrict = isStrict && d_label_model[itl->second].d_strict;
+          }
+          //add existing heap locations to this atom
+          for( std::map< Node, Node >::iterator itcl = curr_locs.begin(); itcl != curr_locs.end(); ++itcl ){
+            addHeapLocToLabel( lbl, atom, itcl->second, itcl->first );
+          }
+          //add new heap locations to other atoms
+          for( unsigned k=0; k<ia; k++ ){
+            for( unsigned j=0; j<new_locs.size(); j++ ){
+              addHeapLocToLabel( lbl, d_label_model[lbl].d_heap_active_assertions[k], new_locs[j], new_locs_r[j] );
+            }
+          }
+          d_label_model[lbl].d_strict = d_label_model[lbl].d_strict || isStrict;
         }
-      }else{
-        // no constraints
       }
       if( Trace.isOn("sep-process-model") ){
         Trace("sep-process-model") << "Sep:Model : locs for " << lbl << " : ";
@@ -862,11 +865,8 @@ void TheorySep::addHeapLocToLabel( Node lbl, Node atom, Node loc, Node loc_r ) {
         Trace("sep-process-model-debug") << "...add to child : " << c_lbl << std::endl;
         d_label_model[c_lbl].d_heap_locs.push_back( loc );
         d_label_model[c_lbl].d_heap_locs_r.push_back( loc_r );
-        std::map< Node, std::vector< Node > >::iterator ita = d_heap_active_assertions.find( c_lbl );
-        if( ita!=d_heap_active_assertions.end() ){
-          for( unsigned j=0; j<ita->second.size(); j++ ){
-            addHeapLocToLabel( c_lbl, ita->second[j], loc, loc_r );
-          }
+        for( unsigned j=0; j<d_label_model[c_lbl].d_heap_active_assertions.size(); j++ ){
+          addHeapLocToLabel( c_lbl, d_label_model[c_lbl].d_heap_active_assertions[j], loc, loc_r );
         }
         return;
       }

@@ -218,31 +218,23 @@ class TheorySep : public Theory {
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   void getLabelChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels );
 
-  class HeapLoc {
-  public:
-    //value for this location
-    Node d_val;
-    //explanation
-    Node d_exp;
-    //labelled explanation
-    Node d_lexp;
-  };
   class HeapInfo {
   public:
-    HeapInfo() : d_strict( false ) {}
-    //std::map< Node, HeapLoc > d_heap;
+    HeapInfo() : d_computed(false), d_strict( false ) {}
+    //information about the assertions
+    std::vector< Node > d_heap_active_assertions;
+    std::vector< Node > d_heap_active_wassertions;
+    Node d_heap_pos_pto;
+    //information about the model
+    bool d_computed;
     bool d_strict;
-    //in the case it is a strict heap, d_exp explains why this heap is exactly this
-    //std::vector< Node > d_strict_exp;
     std::vector< Node > d_heap_locs;
     std::vector< Node > d_heap_locs_r;
     std::vector< Node > d_heap_locs_model;
     //get value
     Node getValue( TypeNode tn );
   };
-  //current assertions
-  std::map< Node, std::vector< Node > > d_heap_active_assertions;
-  std::map< Node, Node > d_heap_pos_pto;
+  //heap info ( label -> HeapInfo )
   std::map< Node, HeapInfo > d_label_model;
 
   //negated instantiation trie
@@ -258,7 +250,6 @@ class TheorySep : public Theory {
   };
   std::map< Node, InstTrie > d_neg_inst_trie;
 
-  //bool checkHeap( Node lbl, HeapInfo& heap );
   void debugPrintHeap( HeapInfo& heap, const char * c );
   void validatePto( HeapAssertInfo * ei, Node ei_n );
   void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity );
