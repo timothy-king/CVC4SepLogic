@@ -217,6 +217,7 @@ class TheorySep : public Theory {
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   void getLabelChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels );
+  void getSubLabels( Node atom, Node lbl, std::vector< Node >& labels );
 
   class HeapInfo {
   public:
@@ -224,6 +225,7 @@ class TheorySep : public Theory {
     //information about the assertions
     std::vector< Node > d_heap_active_assertions;
     std::vector< Node > d_heap_active_wassertions;
+    std::map< Node, Node > d_wand_to_base_label;
     Node d_heap_pos_pto;
     //information about the model
     bool d_computed;
