@@ -280,9 +280,8 @@ void TheorySep::check(Effort e) {
             if( s_atom.getKind()==kind::SEP_STAR ){
               std::vector< Node > children;
               std::vector< Node > labels;
-              getStarChildren( s_atom, s_lbl, children, labels );
+              getLabelChildren( s_atom, s_lbl, children, labels );
               Assert( children.size()>1 );
-              std::vector< Node > conj;
               //reduction for heap : union, pairwise disjoint
               Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, labels[0], labels[1] );
               for( unsigned i=2; i<labels.size(); i++ ){
@@ -302,7 +301,19 @@ void TheorySep::check(Effort e) {
               }
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_WAND ){
-              //TODO
+              std::vector< Node > children;
+              std::vector< Node > labels;
+              getLabelChildren( s_atom, s_lbl, children, labels );
+              Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
+              ulem = s_lbl.eqNode( labels[1] );
+              Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, union : " << ulem << std::endl;
+              children.push_back( ulem );
+              Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
+              Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, s_lbl, labels[0] );
+              Node ilem = s.eqNode( empSet );
+              Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
+              children.push_back( ilem );
+              conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
               conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );
             }else{
@@ -316,7 +327,7 @@ void TheorySep::check(Effort e) {
           }else{
             conc = its->second;
           }
-          if( !polarity ){
+          if( s_atom.getKind()==kind::SEP_WAND ? polarity : !polarity ){
             // introduce guard, assert positive version
             Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
             d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
@@ -329,7 +340,11 @@ void TheorySep::check(Effort e) {
             d_out->lemma( lem );
           }else{
             //reduce based on implication
-            Node lem = NodeManager::currentNM()->mkNode( kind::OR, atom.negate(), conc );
+            Node ant = atom;
+            if( s_atom.getKind()!=kind::SEP_WAND ){
+              ant = atom.negate();
+            }
+            Node lem = NodeManager::currentNM()->mkNode( kind::OR, ant, conc );
             Trace("sep-lemma") << "Sep::Lemma : reduction : " << lem << std::endl;
             d_out->lemma( lem );
           }
@@ -727,13 +742,16 @@ Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) 
   }
 }
 
-void TheorySep::getStarChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels ) {
+void TheorySep::getLabelChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels ) {
   for( unsigned i=0; i<atom.getNumChildren(); i++ ){
     Node lblc = getLabel( atom, i, lbl );
     Assert( !lblc.isNull() );
     std::map< Node, Node > visited;
     Node lc = applyLabel( atom[i], lblc, visited );
     Assert( !lc.isNull() );
+    if( i==1 && atom.getKind()==kind::SEP_WAND ){
+      lc = lc.negate();
+    }
     children.push_back( lc );
     labels.push_back( lblc );
   }
