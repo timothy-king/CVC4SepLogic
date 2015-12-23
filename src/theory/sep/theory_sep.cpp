@@ -305,13 +305,13 @@ void TheorySep::check(Effort e) {
               std::vector< Node > labels;
               getLabelChildren( s_atom, s_lbl, children, labels );
               Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
-              ulem = s_lbl.eqNode( labels[1] );
+              ulem = ulem.eqNode( labels[1] );
               Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, union : " << ulem << std::endl;
               children.push_back( ulem );
               Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
               Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, s_lbl, labels[0] );
               Node ilem = s.eqNode( empSet );
-              Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
+              Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, disjoint : " << ilem << std::endl;
               children.push_back( ilem );
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
@@ -411,8 +411,9 @@ void TheorySep::check(Effort e) {
       }
       if( assert_active[fact] ){
         Node use_s_lbl = s_lbl;
-        if( atom.getKind()==kind::SEP_WAND ){
+        if( s_atom.getKind()==kind::SEP_WAND ){
           use_s_lbl = getLabel( s_atom, 1, s_lbl );
+          Trace("sep-process") << " [" << use_s_lbl << "]";
         }
         d_label_model[use_s_lbl].d_heap_active_assertions.push_back( s_atom );
         if( s_atom.getKind()==kind::SEP_WAND ){
@@ -466,13 +467,14 @@ void TheorySep::check(Effort e) {
         TNode atom = polarity ? fact : fact[0];
         TNode s_atom = atom[0];
         bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
+        Trace("sep-process-debug") << "  check atom : " << s_atom << " use polarity " << use_polarity << std::endl;
         if( !use_polarity ){
           Assert( assert_active.find( fact )!=assert_active.end() );
           if( assert_active[fact] ){
             Assert( atom.getKind()==kind::SEP_LABEL );
             TNode s_lbl = atom[1];
             Node use_s_lbl = s_lbl;
-            if( atom.getKind()==kind::SEP_WAND ){
+            if( s_atom.getKind()==kind::SEP_WAND ){
               use_s_lbl = getLabel( s_atom, 1, s_lbl );
             }
             Trace("sep-process") << "--> Active negated atom : " << s_atom << ", lbl = " << use_s_lbl << std::endl;
@@ -500,7 +502,7 @@ void TheorySep::check(Effort e) {
                 std::map< Node, Node > visited;
                 Node c = applyLabel( s_atom[itl->first], mvals[sub_index], visited );
                 Trace("sep-process-debug") << "    applied inst : " << c << std::endl;
-                if( s_atom.getKind()==kind::SEP_STAR || sub_index==1 ){
+                if( s_atom.getKind()==kind::SEP_STAR || sub_index==0 ){
                   conc.push_back( c.negate() );
                 }else{
                   conc.push_back( c );
@@ -510,7 +512,11 @@ void TheorySep::check(Effort e) {
               // Now, assert model-instantiated implication based on the negation
               Node o_b_lbl_mval = d_label_model[s_lbl].getValue( tn );
               std::vector< Node > lemc;
-              lemc.push_back( atom );
+              Node pol_atom = atom;
+              if( polarity ){
+                pol_atom = atom.negate();
+              }
+              lemc.push_back( pol_atom );
               lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
               lemc.insert( lemc.end(), conc.begin(), conc.end() );
               Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
@@ -521,6 +527,8 @@ void TheorySep::check(Effort e) {
               Trace("sep-process-debug") << "  no children." << std::endl;
               Assert( s_atom.getKind()==kind::SEP_PTO );
             }
+          }else{
+            Trace("sep-process-debug") << "--> inactive negated assertion " << s_atom << std::endl;
           }
         }
       }
