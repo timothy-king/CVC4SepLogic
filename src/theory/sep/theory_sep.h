@@ -238,19 +238,6 @@ class TheorySep : public Theory {
   //heap info ( label -> HeapInfo )
   std::map< Node, HeapInfo > d_label_model;
 
-  //negated instantiation trie
-  class InstTrie {
-  private:
-    bool existsInst2( int nchildren, std::map< int, std::vector< Node > >& models, int index, int sindex );
-  public:
-    InstTrie() : d_data(false){}
-    ~InstTrie(){}
-    std::map< Node, InstTrie > d_children;
-    bool d_data;
-    bool existsInst( int nchildren, std::map< int, std::vector< Node > >& models );
-  };
-  std::map< Node, InstTrie > d_neg_inst_trie;
-
   void debugPrintHeap( HeapInfo& heap, const char * c );
   void validatePto( HeapAssertInfo * ei, Node ei_n );
   void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity );
