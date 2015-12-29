@@ -277,42 +277,42 @@ void TheorySep::check(Effort e) {
           std::map< Node, Node >::iterator its = d_red_conc[s_lbl].find( s_atom );
           if( its==d_red_conc[s_lbl].end() ){
             //make conclusion based on type of assertion
-            if( s_atom.getKind()==kind::SEP_STAR ){
+            if( s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND ){
               std::vector< Node > children;
               std::vector< Node > labels;
               getLabelChildren( s_atom, s_lbl, children, labels );
+              //get the references
+              getReferenceType( s_atom );
               Assert( children.size()>1 );
-              //reduction for heap : union, pairwise disjoint
-              Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, labels[0], labels[1] );
-              for( unsigned i=2; i<labels.size(); i++ ){
-                ulem = NodeManager::currentNM()->mkNode( kind::UNION, ulem, labels[i] );
-              }
-              ulem = s_lbl.eqNode( ulem );
-              Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, union : " << ulem << std::endl;
-              children.push_back( ulem );
-              Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
-              for( unsigned i=0; i<labels.size(); i++ ){
-                for( unsigned j=(i+1); j<labels.size(); j++ ){
-                  Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, labels[i], labels[j] );
-                  Node ilem = s.eqNode( empSet );
-                  Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
-                  children.push_back( ilem );
+              if( s_atom.getKind()==kind::SEP_STAR ){
+                //reduction for heap : union, pairwise disjoint
+                Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, labels[0], labels[1] );
+                for( unsigned i=2; i<labels.size(); i++ ){
+                  ulem = NodeManager::currentNM()->mkNode( kind::UNION, ulem, labels[i] );
                 }
+                ulem = s_lbl.eqNode( ulem );
+                Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, union : " << ulem << std::endl;
+                children.push_back( ulem );
+                Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
+                for( unsigned i=0; i<labels.size(); i++ ){
+                  for( unsigned j=(i+1); j<labels.size(); j++ ){
+                    Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, labels[i], labels[j] );
+                    Node ilem = s.eqNode( empSet );
+                    Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
+                    children.push_back( ilem );
+                  }
+                }
+              }else{
+                Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
+                ulem = ulem.eqNode( labels[1] );
+                Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, union : " << ulem << std::endl;
+                children.push_back( ulem );
+                Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
+                Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, s_lbl, labels[0] );
+                Node ilem = s.eqNode( empSet );
+                Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, disjoint : " << ilem << std::endl;
+                children.push_back( ilem );
               }
-              conc = NodeManager::currentNM()->mkNode( kind::AND, children );
-            }else if( s_atom.getKind()==kind::SEP_WAND ){
-              std::vector< Node > children;
-              std::vector< Node > labels;
-              getLabelChildren( s_atom, s_lbl, children, labels );
-              Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
-              ulem = ulem.eqNode( labels[1] );
-              Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, union : " << ulem << std::endl;
-              children.push_back( ulem );
-              Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
-              Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, s_lbl, labels[0] );
-              Node ilem = s.eqNode( empSet );
-              Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, disjoint : " << ilem << std::endl;
-              children.push_back( ilem );
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
               conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );
@@ -608,20 +608,23 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
   if( visited.find( n )==visited.end() ){
     visited[n] = true;
     if( n.getKind()==kind::SEP_PTO ){
-      //if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references.end() ){
-      //  d_references[atom].push_back( n[0] );
-      //}
+      if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
+        d_references[atom].push_back( n[0] );
+      }
       return n[1].getType();
+    }else if( n.getKind()==kind::SEP_PTO ){
+      TypeNode otn = getReferenceType( n );
+      d_references[atom].insert( d_references[atom].end(), d_references[n].begin(), d_references[n].end() );
+      return otn;
     }else{
-      //TypeNode otn;
+      TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
         TypeNode tn = getReferenceType2( atom, n[i], visited );
         if( !tn.isNull() ){
-          //otn = tn;
-          return tn;
+          otn = tn;
         }
       }
-      //return otn;
+      return otn;
     }
   }
   return TypeNode::null();
@@ -734,7 +737,7 @@ void TheorySep::computeLabelModel( Node lbl ) {
     //Node v_val = d_valuation.getModelValue( s_lbl );
     //hack FIXME
     Node v_val = d_last_model->getRepresentative( lbl );
-    Trace("sep-process-model-debug") << "    model value (from valuation) for " << lbl << " : " << v_val << std::endl;
+    Trace("sep-process") << "    model value (from valuation) for " << lbl << " : " << v_val << std::endl;
     if( v_val.getKind()!=kind::EMPTYSET ){
       while( v_val.getKind()==kind::UNION ){
         Assert( v_val[1].getKind()==kind::SINGLETON );

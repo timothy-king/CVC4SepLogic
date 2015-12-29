@@ -187,7 +187,7 @@ class TheorySep : public Theory {
   std::map< Node, std::map< Node, Node > > d_neg_guard;
   //cache for references
   std::map< Node, TypeNode > d_reference_type;
-  //std::map< Node, std::vector< Node > > d_references;
+  std::map< Node, std::vector< Node > > d_references;
   /** inferences: maintained to ensure ref count for internally introduced nodes */
   NodeList d_infer;
   NodeList d_infer_exp;
