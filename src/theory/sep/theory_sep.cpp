@@ -434,7 +434,7 @@ void TheorySep::check(Effort e) {
           d_label_model[use_s_lbl].d_wand_to_base_label[s_atom] = s_lbl;
           active_wand_lbl.push_back( use_s_lbl );
         }else{
-          if( polarity && s_atom.getKind()==kind::SEP_PTO ){
+          if( s_atom.getKind()==kind::SEP_PTO ){
             d_label_model[use_s_lbl].d_heap_pos_pto = s_atom;
           }
         }
@@ -557,7 +557,7 @@ Node TheorySep::getNextDecisionRequest() {
 
 void TheorySep::conflict(TNode a, TNode b) {
   Trace("sep-conflict") << "Sep::conflict : " << a << " " << b << std::endl;
-  Node conflictNode;doPendingFacts();
+  Node conflictNode;
   if (a.getKind() == kind::CONST_BOOLEAN) {
     conflictNode = explain(a.iffNode(b));
   } else {
@@ -987,7 +987,7 @@ void TheorySep::mergePto( Node p1, Node p2 ) {
     }
     exp.push_back( p1 );
     exp.push_back( p2 );
-    sendLemma( exp, p1[0][1].eqNode( p2[0][1] ), "PTO_PROP", true );
+    sendLemma( exp, p1[0][1].eqNode( p2[0][1] ), "PTO_PROP" );
   }
 }
 
