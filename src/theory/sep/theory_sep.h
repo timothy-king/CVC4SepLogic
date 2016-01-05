@@ -116,7 +116,7 @@ class TheorySep : public Theory {
   void shutdown() { }
 
   /////////////////////////////////////////////////////////////////////////////
-  // MAIN SOLVER#include "context/cdhashmap.h"
+  // MAIN SOLVER
   /////////////////////////////////////////////////////////////////////////////
   public:
 
@@ -195,6 +195,8 @@ class TheorySep : public Theory {
 
   std::map< TypeNode, Node > d_base_label;
   std::map< Node, std::map< int, Node > > d_label_map;
+  //reference bound
+  std::map< TypeNode, Node > d_reference_bound;
 
   class HeapAssertInfo {
   public:

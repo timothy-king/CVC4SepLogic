@@ -279,6 +279,9 @@ void TheorySep::check(Effort e) {
             //make conclusion based on type of assertion
             if( s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND ){
               std::vector< Node > children;
+              TypeNode tn = getReferenceType( s_atom );
+              Assert( d_reference_bound.find( tn )!=d_reference_bound.end() );
+              children.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
               std::vector< Node > labels;
               getLabelChildren( s_atom, s_lbl, children, labels );
               Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
@@ -300,6 +303,7 @@ void TheorySep::check(Effort e) {
                     children.push_back( ilem );
                   }
                 }
+                /*
                 Assert( d_references.find( s_atom )!=d_references.end() );
                 Node slem;
                 for( unsigned i=0; i<d_references[s_atom].size(); i++ ){
@@ -315,6 +319,7 @@ void TheorySep::check(Effort e) {
                 slem = NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, slem );
                 Trace("sep-lemma-debug") << "Sep::Lemma : star subset : " << slem << std::endl;
                 children.push_back( slem );
+                */
               }else{
                 Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
                 ulem = ulem.eqNode( labels[1] );
@@ -620,27 +625,28 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
   if( visited.find( n )==visited.end() ){
     visited[n] = true;
     if( n.getKind()==kind::SEP_PTO ){
-      if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
-        d_references[atom].push_back( n[0] );
-      }
+      //if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
+      //  d_references[atom].push_back( n[0] );
+      //}
       return n[1].getType();
     }else if( n!=atom && ( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ) ){
       TypeNode tn = getReferenceType( n );
-      for( unsigned j=0; j<d_references[n].size(); j++ ){
-        if( std::find( d_references[atom].begin(), d_references[atom].end(), d_references[n][j] )==d_references[atom].end() ){
-          d_references[atom].push_back( d_references[n][j] );
-        }
-      }
+      //for( unsigned j=0; j<d_references[n].size(); j++ ){
+      //  if( std::find( d_references[atom].begin(), d_references[atom].end(), d_references[n][j] )==d_references[atom].end() ){
+      //    d_references[atom].push_back( d_references[n][j] );
+      //  }
+      //}
       return tn;
     }else{
-      TypeNode otn;
+      //TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
         TypeNode tn = getReferenceType2( atom, n[i], visited );
         if( !tn.isNull() ){
-          otn = tn;
+          //otn = tn;
+          return tn;
         }
       }
-      return otn;
+      //return otn;
     }
   }
   return TypeNode::null();
@@ -654,6 +660,11 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
     Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_base_label[tn] = n_lbl;
+    //make reference bound
+    std::stringstream ss2;
+    ss2 << "__Lu";
+    Node n_lbl2 = NodeManager::currentNM()->mkSkolem( ss2.str(), ltn, "" );
+    d_reference_bound[tn] = n_lbl2;
     return n_lbl;
   }else{
     return it->second;
