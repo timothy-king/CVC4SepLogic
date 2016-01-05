@@ -300,11 +300,11 @@ void TheorySep::check(Effort e) {
                     children.push_back( ilem );
                   }
                 }
-                /*
-                Assert( d_references.find( s_lbl )!=d_references.end() );
+                Assert( d_references.find( s_atom )!=d_references.end() );
                 Node slem;
-                for( unsigned i=0; i<d_references[s_lbl].size(); i++ ){
-                  Node s = d_references[s_lbl][i];
+                for( unsigned i=0; i<d_references[s_atom].size(); i++ ){
+                  Node s = d_references[s_atom][i];
+                  s = NodeManager::currentNM()->mkNode( kind::SINGLETON, s );
                   if( slem.isNull() ){
                     slem = s;
                   }else{
@@ -315,7 +315,6 @@ void TheorySep::check(Effort e) {
                 slem = NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, slem );
                 Trace("sep-lemma-debug") << "Sep::Lemma : star subset : " << slem << std::endl;
                 children.push_back( slem );
-                */
               }else{
                 Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
                 ulem = ulem.eqNode( labels[1] );
@@ -621,20 +620,27 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
   if( visited.find( n )==visited.end() ){
     visited[n] = true;
     if( n.getKind()==kind::SEP_PTO ){
-      //if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
-      //  d_references[atom].push_back( n[0] );
-      //}
+      if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
+        d_references[atom].push_back( n[0] );
+      }
       return n[1].getType();
+    }else if( n!=atom && ( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ) ){
+      TypeNode tn = getReferenceType( n );
+      for( unsigned j=0; j<d_references[n].size(); j++ ){
+        if( std::find( d_references[atom].begin(), d_references[atom].end(), d_references[n][j] )==d_references[atom].end() ){
+          d_references[atom].push_back( d_references[n][j] );
+        }
+      }
+      return tn;
     }else{
-      //TypeNode otn;
+      TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
         TypeNode tn = getReferenceType2( atom, n[i], visited );
         if( !tn.isNull() ){
-          //otn = tn;
-          return tn;
+          otn = tn;
         }
       }
-      //return otn;
+      return otn;
     }
   }
   return TypeNode::null();
