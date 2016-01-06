@@ -80,7 +80,13 @@ Node TheorySep::mkAnd( std::vector< TNode >& assumptions ) {
 
 
 Node TheorySep::ppRewrite(TNode term) {
-
+  Trace("sep-pp") << "ppRewrite : " << term << std::endl;
+  Node s_atom = term.getKind()==kind::NOT ? term[0] : term;
+  if( s_atom.getKind()==kind::SEP_PTO || s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND || s_atom.getKind()==kind::EMP_STAR ){
+    //get the reference type (will compute d_type_references)
+    TypeNode tn = getReferenceType( s_atom );
+    Trace("sep-pp") << "  reference type is " << tn << std::endl;
+  }
   return term;
 }
 
@@ -218,7 +224,8 @@ void TheorySep::collectModelInfo( TheoryModel* m, bool fullModel )
 
 
 void TheorySep::presolve() {
-  Trace("sep") << "Presolving" << std::endl;
+  Trace("sep-pp") << "Presolving" << std::endl;
+  //TODO: cleanup if incremental?
 }
 
 
@@ -264,7 +271,7 @@ void TheorySep::check(Effort e) {
         }else{
           lem = NodeManager::currentNM()->mkNode( kind::OR, s_atom, s_atom_new.negate() );
         }
-        Trace("sep-lemma") << "Sep::Lemma : base reduction : " << lem << std::endl;
+        Trace("sep-lemma-debug") << "Sep::Lemma : base reduction : " << lem << std::endl;
         d_out->lemma( lem );
       }
     }else{
@@ -332,7 +339,10 @@ void TheorySep::check(Effort e) {
               }
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
-              conc = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );
+              Node ss = NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] );
+              if( s_lbl!=ss ){
+                conc = s_lbl.eqNode( ss );
+              }
             }else{
               //labeled empty star should be rewritten
               //else if( s_atom.getKind()==kind::EMP_STAR ){
@@ -344,27 +354,31 @@ void TheorySep::check(Effort e) {
           }else{
             conc = its->second;
           }
-          bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
-          if( !use_polarity ){
-            // introduce guard, assert positive version
-            Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
-            d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
-            d_neg_guard[s_lbl][s_atom] = getValuation().ensureLiteral( d_neg_guard[s_lbl][s_atom] );
-            Trace("sep-lemma-debug") << "Neg guard : " << s_lbl << " " << s_atom << " " << d_neg_guard[s_lbl][s_atom] << std::endl;
-            AlwaysAssert( !d_neg_guard[s_lbl][s_atom].isNull() );
-            d_out->requirePhase( d_neg_guard[s_lbl][s_atom], true );
-            Node lem = NodeManager::currentNM()->mkNode( kind::OR, d_neg_guard[s_lbl][s_atom].negate(), conc );
-            Trace("sep-lemma") << "Sep::Lemma : (neg) reduction : " << lem << std::endl;
-            d_out->lemma( lem );
-          }else{
-            //reduce based on implication
-            Node ant = atom;
-            if( polarity ){
-              ant = atom.negate();
+          if( !conc.isNull() ){
+            bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
+            if( !use_polarity ){
+              // introduce guard, assert positive version
+              Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
+              d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
+              d_neg_guard[s_lbl][s_atom] = getValuation().ensureLiteral( d_neg_guard[s_lbl][s_atom] );
+              Trace("sep-lemma-debug") << "Neg guard : " << s_lbl << " " << s_atom << " " << d_neg_guard[s_lbl][s_atom] << std::endl;
+              AlwaysAssert( !d_neg_guard[s_lbl][s_atom].isNull() );
+              d_out->requirePhase( d_neg_guard[s_lbl][s_atom], true );
+              Node lem = NodeManager::currentNM()->mkNode( kind::OR, d_neg_guard[s_lbl][s_atom].negate(), conc );
+              Trace("sep-lemma") << "Sep::Lemma : (neg) reduction : " << lem << std::endl;
+              d_out->lemma( lem );
+            }else{
+              //reduce based on implication
+              Node ant = atom;
+              if( polarity ){
+                ant = atom.negate();
+              }
+              Node lem = NodeManager::currentNM()->mkNode( kind::OR, ant, conc );
+              Trace("sep-lemma") << "Sep::Lemma : reduction : " << lem << std::endl;
+              d_out->lemma( lem );
             }
-            Node lem = NodeManager::currentNM()->mkNode( kind::OR, ant, conc );
-            Trace("sep-lemma") << "Sep::Lemma : reduction : " << lem << std::endl;
-            d_out->lemma( lem );
+          }else{
+            Trace("sep-lemma-debug") << "Trivial conclusion, do not add lemma." << std::endl;
           }
         }
       }
@@ -607,14 +621,32 @@ TheorySep::HeapAssertInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
 }
 
 TypeNode TheorySep::getReferenceType( Node atom ) {
+  Assert( atom.getKind()==kind::SEP_PTO || atom.getKind()==kind::SEP_STAR || atom.getKind()==kind::SEP_WAND || atom.getKind()==kind::EMP_STAR );
   std::map< Node, TypeNode >::iterator it = d_reference_type.find( atom );
   if( it==d_reference_type.end() ){
+    //will compute d_references as well
     std::map< Node, bool > visited;
     TypeNode tn = getReferenceType2( atom, atom, visited );
     if( tn.isNull() ){
       tn = NodeManager::currentNM()->booleanType();
     }
     d_reference_type[atom] = tn;
+    //add to d_type_references
+    unsigned emp_occ = 0;
+    for( unsigned i=0; i<d_references[atom].size(); i++ ){
+      if( !d_references[atom][i].isNull() ){
+        if( std::find( d_type_references[tn].begin(), d_type_references[tn].end(), d_references[atom][i] )==d_type_references[tn].end() ){
+          d_type_references[tn].push_back( d_references[atom][i] );
+        }
+      }else{
+        //new variable for each emp occurrence
+        emp_occ++;
+      }
+    }
+    if( emp_occ>d_emp_occ_max[tn] ){
+      d_emp_occ_max[tn] = emp_occ;
+    }
+
     return tn;
   }else{
     return it->second;
@@ -625,28 +657,30 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
   if( visited.find( n )==visited.end() ){
     visited[n] = true;
     if( n.getKind()==kind::SEP_PTO ){
-      //if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
-      //  d_references[atom].push_back( n[0] );
-      //}
+      if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
+        d_references[atom].push_back( n[0] );
+      }
       return n[1].getType();
+    }else if( n.getKind()==kind::EMP_STAR ){
+      d_references[atom].push_back( Node::null() );
     }else if( n!=atom && ( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ) ){
       TypeNode tn = getReferenceType( n );
-      //for( unsigned j=0; j<d_references[n].size(); j++ ){
-      //  if( std::find( d_references[atom].begin(), d_references[atom].end(), d_references[n][j] )==d_references[atom].end() ){
-      //    d_references[atom].push_back( d_references[n][j] );
-      //  }
-      //}
+      for( unsigned j=0; j<d_references[n].size(); j++ ){
+        if( std::find( d_references[atom].begin(), d_references[atom].end(), d_references[n][j] )==d_references[atom].end() ){
+          d_references[atom].push_back( d_references[n][j] );
+        }
+      }
       return tn;
     }else{
-      //TypeNode otn;
+      TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
         TypeNode tn = getReferenceType2( atom, n[i], visited );
         if( !tn.isNull() ){
-          //otn = tn;
-          return tn;
+          otn = tn;
+          //return tn;
         }
       }
-      //return otn;
+      return otn;
     }
   }
   return TypeNode::null();
@@ -655,16 +689,43 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
 Node TheorySep::getBaseLabel( TypeNode tn ) {
   std::map< TypeNode, Node >::iterator it = d_base_label.find( tn );
   if( it==d_base_label.end() ){
+    Trace("sep") << "Make base label for " << tn << std::endl;
     std::stringstream ss;
     ss << "__Lb";
     TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
     Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_base_label[tn] = n_lbl;
     //make reference bound
+    Trace("sep") << "Make reference bound label for " << tn << std::endl;
     std::stringstream ss2;
     ss2 << "__Lu";
-    Node n_lbl2 = NodeManager::currentNM()->mkSkolem( ss2.str(), ltn, "" );
-    d_reference_bound[tn] = n_lbl2;
+    d_reference_bound[tn] = NodeManager::currentNM()->mkSkolem( ss2.str(), ltn, "" );
+    std::vector< Node > trs;
+    trs.insert( trs.end(), d_type_references[tn].begin(), d_type_references[tn].end() );
+    //add a reference type for maximum occurrences of empty in a constraint
+    unsigned n_emp = d_emp_occ_max[tn]>d_emp_occ_max[TypeNode::null()] ? d_emp_occ_max[tn] : d_emp_occ_max[TypeNode::null()];
+    for( unsigned r=0; r<n_emp; r++ ){
+      trs.push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
+    }
+    //construct bound
+    if( trs.empty() ){
+      d_reference_bound_max[tn] = NodeManager::currentNM()->mkConst(EmptySet(ltn.toType()));
+    }else{
+      for( unsigned i=0; i<trs.size(); i++ ){
+        Node s = trs[i];
+        Assert( !s.isNull() );
+        s = NodeManager::currentNM()->mkNode( kind::SINGLETON, s );
+        if( d_reference_bound_max[tn].isNull() ){
+          d_reference_bound_max[tn] = s;
+        }else{
+          d_reference_bound_max[tn] = NodeManager::currentNM()->mkNode( kind::UNION, s, d_reference_bound_max[tn] );
+        }
+      }
+    }
+    Node slem = NodeManager::currentNM()->mkNode( kind::SUBSET, d_reference_bound[tn], d_reference_bound_max[tn] );
+    Trace("sep-lemma") << "Sep::Lemma: reference bound for " << tn << " : " << slem << std::endl;
+    d_out->lemma( slem );
+
     return n_lbl;
   }else{
     return it->second;

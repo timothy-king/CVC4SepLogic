@@ -197,6 +197,9 @@ class TheorySep : public Theory {
   std::map< Node, std::map< int, Node > > d_label_map;
   //reference bound
   std::map< TypeNode, Node > d_reference_bound;
+  std::map< TypeNode, Node > d_reference_bound_max;
+  std::map< TypeNode, std::vector< Node > > d_type_references;
+  std::map< TypeNode, unsigned > d_emp_occ_max;
 
   class HeapAssertInfo {
   public:
