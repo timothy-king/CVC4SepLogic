@@ -286,6 +286,7 @@ void TheorySep::check(Effort e) {
             //make conclusion based on type of assertion
             if( s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND ){
               std::vector< Node > children;
+              std::vector< Node > c_lems;
               TypeNode tn = getReferenceType( s_atom );
               Assert( d_reference_bound.find( tn )!=d_reference_bound.end() );
               children.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
@@ -301,13 +302,13 @@ void TheorySep::check(Effort e) {
                 }
                 ulem = s_lbl.eqNode( ulem );
                 Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, union : " << ulem << std::endl;
-                children.push_back( ulem );
+                c_lems.push_back( ulem );
                 for( unsigned i=0; i<labels.size(); i++ ){
                   for( unsigned j=(i+1); j<labels.size(); j++ ){
                     Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, labels[i], labels[j] );
                     Node ilem = s.eqNode( empSet );
                     Trace("sep-lemma-debug") << "Sep::Lemma : star reduction, disjoint : " << ilem << std::endl;
-                    children.push_back( ilem );
+                    c_lems.push_back( ilem );
                   }
                 }
                 /*
@@ -331,12 +332,20 @@ void TheorySep::check(Effort e) {
                 Node ulem = NodeManager::currentNM()->mkNode( kind::UNION, s_lbl, labels[0] );
                 ulem = ulem.eqNode( labels[1] );
                 Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, union : " << ulem << std::endl;
-                children.push_back( ulem );
+                c_lems.push_back( ulem );
                 Node s = NodeManager::currentNM()->mkNode( kind::INTERSECTION, s_lbl, labels[0] );
                 Node ilem = s.eqNode( empSet );
                 Trace("sep-lemma-debug") << "Sep::Lemma : wand reduction, disjoint : " << ilem << std::endl;
-                children.push_back( ilem );
+                c_lems.push_back( ilem );
               }
+              /*
+              //send out definitional lemmas for introduced sets?
+              for( unsigned j=0; j<c_lems.size(); j++ ){
+                Trace("sep-lemma") << "Sep::Lemma : definition : " << c_lems[j] << std::endl;
+                d_out->lemma( c_lems[j] );
+              }
+              */
+              children.insert( children.end(), c_lems.begin(), c_lems.end() );
               conc = NodeManager::currentNM()->mkNode( kind::AND, children );
             }else if( s_atom.getKind()==kind::SEP_PTO ){
               Node ss = NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] );
@@ -359,12 +368,14 @@ void TheorySep::check(Effort e) {
             if( !use_polarity ){
               // introduce guard, assert positive version
               Trace("sep-lemma-debug") << "Negated spatial constraint asserted to sep theory: " << fact << std::endl;
-              d_neg_guard[s_lbl][s_atom] = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
-              d_neg_guard[s_lbl][s_atom] = getValuation().ensureLiteral( d_neg_guard[s_lbl][s_atom] );
-              Trace("sep-lemma-debug") << "Neg guard : " << s_lbl << " " << s_atom << " " << d_neg_guard[s_lbl][s_atom] << std::endl;
-              AlwaysAssert( !d_neg_guard[s_lbl][s_atom].isNull() );
-              d_out->requirePhase( d_neg_guard[s_lbl][s_atom], true );
-              Node lem = NodeManager::currentNM()->mkNode( kind::OR, d_neg_guard[s_lbl][s_atom].negate(), conc );
+              Node lit = Rewriter::rewrite( NodeManager::currentNM()->mkSkolem( "G", NodeManager::currentNM()->booleanType() ) );
+              lit = getValuation().ensureLiteral( lit );
+              d_neg_guard[s_lbl][s_atom] = lit;
+              Trace("sep-lemma-debug") << "Neg guard : " << s_lbl << " " << s_atom << " " << lit << std::endl;
+              AlwaysAssert( !lit.isNull() );
+              d_out->requirePhase( lit, true );
+              d_neg_guards.push_back( lit );
+              Node lem = NodeManager::currentNM()->mkNode( kind::OR, lit.negate(), conc );
               Trace("sep-lemma") << "Sep::Lemma : (neg) reduction : " << lem << std::endl;
               d_out->lemma( lem );
             }else{
@@ -432,12 +443,15 @@ void TheorySep::check(Effort e) {
       assert_active[fact] = true;
       bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
       if( !use_polarity ){
-        Assert( d_neg_guard[s_lbl].find( s_atom )!=d_neg_guard[s_lbl].end() );
-        //check if the guard is asserted positively
-        Node guard = d_neg_guard[s_lbl][s_atom];
-        bool value;
-        if( getValuation().hasSatValue( guard, value ) ) {
-          assert_active[fact] = value;
+        if( d_neg_guard[s_lbl].find( s_atom )!=d_neg_guard[s_lbl].end() ){
+          //check if the guard is asserted positively
+          Node guard = d_neg_guard[s_lbl][s_atom];
+          bool value;
+          if( getValuation().hasSatValue( guard, value ) ) {
+            assert_active[fact] = value;
+          }
+        }else{
+          assert_active[fact] = true;
         }
       }
       if( assert_active[fact] ){
@@ -570,6 +584,15 @@ void TheorySep::check(Effort e) {
 
 
 Node TheorySep::getNextDecisionRequest() {
+  for( unsigned i=0; i<d_neg_guards.size(); i++ ){
+    Node g = d_neg_guards[i];
+    bool value;
+    if( !d_valuation.hasSatValue( g, value ) ) {
+      Trace("sep-dec") << "getNextDecisionRequest : " << g << " (" << i << "/" << d_neg_guards.size() << ")" << std::endl;
+      return g;
+    }
+  }
+  Trace("sep-dec") << "getNextDecisionRequest : null" << std::endl;
   return Node::null();
 }
 
@@ -725,7 +748,9 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     Node slem = NodeManager::currentNM()->mkNode( kind::SUBSET, d_reference_bound[tn], d_reference_bound_max[tn] );
     Trace("sep-lemma") << "Sep::Lemma: reference bound for " << tn << " : " << slem << std::endl;
     d_out->lemma( slem );
-
+    //slem = NodeManager::currentNM()->mkNode( kind::SUBSET, d_base_label[tn], d_reference_bound_max[tn] );
+    //Trace("sep-lemma") << "Sep::Lemma: base reference bound for " << tn << " : " << slem << std::endl;
+    //d_out->lemma( slem );
     return n_lbl;
   }else{
     return it->second;

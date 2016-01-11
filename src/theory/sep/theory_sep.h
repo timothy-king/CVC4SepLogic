@@ -185,6 +185,7 @@ class TheorySep : public Theory {
   NodeSet d_reduce;
   std::map< Node, std::map< Node, Node > > d_red_conc;
   std::map< Node, std::map< Node, Node > > d_neg_guard;
+  std::vector< Node > d_neg_guards;
   //cache for references
   std::map< Node, TypeNode > d_reference_type;
   std::map< Node, std::vector< Node > > d_references;
