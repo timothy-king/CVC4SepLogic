@@ -506,6 +506,8 @@ void TheorySep::check(Effort e) {
       }
 
       //process spatial assertions
+      bool addedLemma = false;
+      std::map< Node, Node > pto_model;
       for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
         Node fact = (*i);
         bool polarity = fact.getKind() != kind::NOT;
@@ -513,7 +515,12 @@ void TheorySep::check(Effort e) {
         TNode s_atom = atom[0];
         bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
         Trace("sep-process-debug") << "  check atom : " << s_atom << " use polarity " << use_polarity << std::endl;
-        if( !use_polarity ){
+        if( use_polarity ){
+          if( s_atom.getKind()==kind::SEP_PTO ){
+            Trace("sep-model2") << "Pto : " << s_atom << std::endl;
+            pto_model[s_atom[0]] = s_atom[1];
+          }
+        }else{
           Assert( assert_active.find( fact )!=assert_active.end() );
           if( assert_active[fact] ){
             Assert( atom.getKind()==kind::SEP_LABEL );
@@ -567,13 +574,30 @@ void TheorySep::check(Effort e) {
               Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
               Trace("sep-lemma") << "Sep::Lemma : negated star/wand refinement : " << lem << std::endl;
               d_out->lemma( lem );
-
+              addedLemma = true;
             }else{
               Trace("sep-process-debug") << "  no children." << std::endl;
               Assert( s_atom.getKind()==kind::SEP_PTO );
             }
           }else{
             Trace("sep-process-debug") << "--> inactive negated assertion " << s_atom << std::endl;
+          }
+        }
+      }
+      if( !addedLemma ){
+        for( std::map< TypeNode, Node >::iterator it = d_base_label.begin(); it != d_base_label.end(); ++it ){
+          //, (label = " << it->second << ")
+          Trace("sep-model") << "Model for heap, type = " << it->first << " : " << std::endl;
+          for( unsigned j=0; j<d_label_model[it->second].d_heap_locs.size(); j++ ){
+            Assert( d_label_model[it->second].d_heap_locs[j].getKind()==kind::SINGLETON );
+            Node l = d_label_model[it->second].d_heap_locs[j][0];
+            Trace("sep-model") << "  " << l << " -> ";
+            if( pto_model[l].isNull() ){
+              Trace("sep-model") << "_";
+            }else{
+              Trace("sep-model") << pto_model[l];
+            }
+            Trace("sep-model") << std::endl;
           }
         }
       }
