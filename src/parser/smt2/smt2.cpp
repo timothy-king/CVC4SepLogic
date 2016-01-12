@@ -165,11 +165,11 @@ void Smt2::addSepOperators() {
   addOperator(kind::SEP_STAR, "sep");
   addOperator(kind::SEP_PTO, "pto");
   addOperator(kind::SEP_WAND, "wand");
-  //addOperator(kind::EMP_STAR, "emp");
+  addOperator(kind::EMP_STAR, "emp");
   Parser::addOperator(kind::SEP_STAR);
   Parser::addOperator(kind::SEP_PTO);
   Parser::addOperator(kind::SEP_WAND);
-  //Parser::addOperator(kind::EMP_STAR);
+  Parser::addOperator(kind::EMP_STAR);
 }
 
 void Smt2::addTheory(Theory theory) {

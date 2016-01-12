@@ -32,7 +32,7 @@ enumerator REF_TYPE \
     "::CVC4::theory::sep::RefEnumerator" \
     "theory/sep/type_enumerator.h"
 
-operator EMP_STAR 0 "separation empty heap"
+operator EMP_STAR 1 "separation empty heap"
 operator SEP_PTO 2 "points to relation"
 operator SEP_STAR 2: "separation star"
 operator SEP_WAND 2 "separation magic wand"

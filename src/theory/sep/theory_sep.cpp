@@ -710,6 +710,7 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
       return n[1].getType();
     }else if( n.getKind()==kind::EMP_STAR ){
       d_references[atom].push_back( Node::null() );
+      return n[0].getType();
     }else if( n!=atom && ( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ) ){
       TypeNode tn = getReferenceType( n );
       for( unsigned j=0; j<d_references[n].size(); j++ ){

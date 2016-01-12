@@ -26,7 +26,7 @@ void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& s_children
   Assert( n.getKind()==kind::SEP_STAR );
   for( unsigned i=0; i<n.getNumChildren(); i++ ){
     if( n[i].getKind()==kind::EMP_STAR ){
-      //do nothing
+      s_children.push_back( n[i] );
     }else if( n[i].getKind()==kind::SEP_STAR ){
       getStarChildren( n[i], s_children, ns_children );
     }else if( n[i].getKind()==kind::SEP_PTO ){
@@ -39,16 +39,16 @@ void TheorySepRewriter::getStarChildren( Node n, std::vector< Node >& s_children
         to_add = NodeManager::currentNM()->mkConst( true );
       }else{
         //remove empty star
-        std::vector< Node > no_children;
-        Node es = NodeManager::currentNM()->mkNode( kind::EMP_STAR, no_children );
-        std::vector< Node >::iterator it = std::find( temp_s_children.begin(), temp_s_children.end(), es );
-        if( it!=temp_s_children.end() ){
-          temp_s_children.erase( it, it+1 );
+        std::vector< Node > temp_s_children2;
+        for( unsigned i=0; i<temp_s_children.size(); i++ ){
+          if( temp_s_children[i].getKind()!=kind::EMP_STAR ){
+            temp_s_children2.push_back( temp_s_children[i] );
+          }
         }
-        if( temp_s_children.size()==1 ){
-          to_add = temp_s_children[0];
-        }else if( temp_s_children.size()>1 ){
-          to_add = NodeManager::currentNM()->mkNode( kind::AND, temp_s_children );
+        if( temp_s_children2.size()==1 ){
+          to_add = temp_s_children2[0];
+        }else if( temp_s_children2.size()>1 ){
+          to_add = NodeManager::currentNM()->mkNode( kind::AND, temp_s_children2 );
         }
       }
       if( !to_add.isNull() ){
@@ -123,16 +123,16 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
       std::vector< Node > s_children;
       std::vector< Node > ns_children;
       getStarChildren( node, s_children, ns_children );
-      Node schild;
-      if( s_children.size()==0 ){
-        std::vector< Node > no_children;
-        schild = NodeManager::currentNM()->mkNode( kind::EMP_STAR, no_children );
-      }else if( s_children.size()==1) {
-        schild = s_children[0];
-      }else{
-        schild = NodeManager::currentNM()->mkNode( kind::SEP_STAR, s_children );
+      if( !s_children.empty() ){
+        Node schild;
+        if( s_children.size()==1 ) {
+          schild = s_children[0];
+        }else{
+          schild = NodeManager::currentNM()->mkNode( kind::SEP_STAR, s_children );
+        }
+        ns_children.push_back( schild );
       }
-      ns_children.push_back( schild );
+      Assert( !ns_children.empty() );
       if( ns_children.size()==1 ){
         retNode = ns_children[0];
       }else{
@@ -161,7 +161,8 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
     Trace("sep-rewrite") << "Sep::rewrite : " << node << " -> " << retNode << std::endl;
   }
   return RewriteResponse(node==retNode ? REWRITE_DONE : REWRITE_AGAIN_FULL, retNode);
-}  
+}
+
 
 /*
 RewriteResponse TheorySepRewriter::preRewrite(TNode node) {
