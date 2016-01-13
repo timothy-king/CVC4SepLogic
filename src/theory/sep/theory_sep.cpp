@@ -588,16 +588,20 @@ void TheorySep::check(Effort e) {
         for( std::map< TypeNode, Node >::iterator it = d_base_label.begin(); it != d_base_label.end(); ++it ){
           //, (label = " << it->second << ")
           Trace("sep-model") << "Model for heap, type = " << it->first << " : " << std::endl;
-          for( unsigned j=0; j<d_label_model[it->second].d_heap_locs.size(); j++ ){
-            Assert( d_label_model[it->second].d_heap_locs[j].getKind()==kind::SINGLETON );
-            Node l = d_label_model[it->second].d_heap_locs[j][0];
-            Trace("sep-model") << "  " << l << " -> ";
-            if( pto_model[l].isNull() ){
-              Trace("sep-model") << "_";
-            }else{
-              Trace("sep-model") << pto_model[l];
+          if( d_label_model[it->second].d_heap_locs.empty() ){
+            Trace("sep-model") << "  [empty]" << std::endl;
+          }else{
+            for( unsigned j=0; j<d_label_model[it->second].d_heap_locs.size(); j++ ){
+              Assert( d_label_model[it->second].d_heap_locs[j].getKind()==kind::SINGLETON );
+              Node l = d_label_model[it->second].d_heap_locs[j][0];
+              Trace("sep-model") << "  " << l << " -> ";
+              if( pto_model[l].isNull() ){
+                Trace("sep-model") << "_";
+              }else{
+                Trace("sep-model") << pto_model[l];
+              }
+              Trace("sep-model") << std::endl;
             }
-            Trace("sep-model") << std::endl;
           }
         }
       }
