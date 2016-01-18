@@ -201,6 +201,8 @@ class TheorySep : public Theory {
   std::map< TypeNode, Node > d_reference_bound_max;
   std::map< TypeNode, std::vector< Node > > d_type_references;
   std::map< TypeNode, unsigned > d_emp_occ_max;
+  //for empty argument
+  std::map< TypeNode, Node > d_emp_arg;
 
   class HeapAssertInfo {
   public:
@@ -209,9 +211,6 @@ class TheorySep : public Theory {
     context::CDO< Node > d_pto;
     context::CDO< bool > d_has_neg_pto;
   };
-  std::map< Node, HeapAssertInfo * > d_heap_info;
-  HeapAssertInfo * getOrMakeHeapAssertInfo( Node n, bool doMake = false );
-
   std::map< Node, HeapAssertInfo * > d_eqc_info;
   HeapAssertInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
 

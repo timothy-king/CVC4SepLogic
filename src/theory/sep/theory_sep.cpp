@@ -51,9 +51,6 @@ TheorySep::TheorySep(context::Context* c, context::UserContext* u, OutputChannel
 }
 
 TheorySep::~TheorySep() {
-  for( std::map< Node, HeapAssertInfo * >::iterator it = d_heap_info.begin(); it != d_heap_info.end(); ++it ){
-    delete it->second;
-  }
   for( std::map< Node, HeapAssertInfo * >::iterator it = d_eqc_info.begin(); it != d_eqc_info.end(); ++it ){
     delete it->second;
   }
@@ -253,6 +250,14 @@ void TheorySep::check(Effort e) {
 
     bool polarity = fact.getKind() != kind::NOT;
     TNode atom = polarity ? fact : fact[0];
+    if( atom.getKind()==kind::EMP_STAR ){
+      TypeNode tn = atom[0].getType();
+      if( d_emp_arg.find( tn )==d_emp_arg.end() ){
+        d_emp_arg[tn] = atom[0];
+      }else{
+        //normalize argument TODO
+      }
+    }
     TNode s_atom = atom.getKind()==kind::SEP_LABEL ? atom[0] : atom;
     TNode s_lbl = atom.getKind()==kind::SEP_LABEL ? atom[1] : TNode::null();
     bool is_spatial = s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND || s_atom.getKind()==kind::SEP_PTO || s_atom.getKind()==kind::EMP_STAR;
@@ -289,7 +294,7 @@ void TheorySep::check(Effort e) {
               std::vector< Node > c_lems;
               TypeNode tn = getReferenceType( s_atom );
               Assert( d_reference_bound.find( tn )!=d_reference_bound.end() );
-              children.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
+              c_lems.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
               std::vector< Node > labels;
               getLabelChildren( s_atom, s_lbl, children, labels );
               Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
@@ -639,21 +644,6 @@ void TheorySep::conflict(TNode a, TNode b) {
 
 TheorySep::HeapAssertInfo::HeapAssertInfo( context::Context* c ) : d_pto(c), d_has_neg_pto(c,false) {
 
-}
-
-TheorySep::HeapAssertInfo * TheorySep::getOrMakeHeapAssertInfo( Node lbl, bool doMake ) {
-  std::map< Node, HeapAssertInfo* >::iterator h_i = d_heap_info.find( lbl );
-  if( h_i==d_heap_info.end() ){
-    if( doMake ){
-      HeapAssertInfo* hi = new HeapAssertInfo( getSatContext() );
-      d_heap_info[lbl] = hi;
-      return hi;
-    }else{
-      return NULL;
-    }
-  }else{
-    return (*h_i).second;
-  }
 }
 
 TheorySep::HeapAssertInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
