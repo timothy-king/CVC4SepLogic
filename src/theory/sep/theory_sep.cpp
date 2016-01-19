@@ -513,79 +513,93 @@ void TheorySep::check(Effort e) {
       //process spatial assertions
       bool addedLemma = false;
       std::map< Node, Node > pto_model;
-      for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
-        Node fact = (*i);
-        bool polarity = fact.getKind() != kind::NOT;
-        TNode atom = polarity ? fact : fact[0];
-        TNode s_atom = atom[0];
-        bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
-        Trace("sep-process-debug") << "  check atom : " << s_atom << " use polarity " << use_polarity << std::endl;
-        if( use_polarity ){
-          if( s_atom.getKind()==kind::SEP_PTO ){
-            Trace("sep-model2") << "Pto : " << s_atom << std::endl;
-            pto_model[s_atom[0]] = s_atom[1];
-          }
-        }else{
-          Assert( assert_active.find( fact )!=assert_active.end() );
-          if( assert_active[fact] ){
-            Assert( atom.getKind()==kind::SEP_LABEL );
-            TNode s_lbl = atom[1];
-            Node use_s_lbl = s_lbl;
-            if( s_atom.getKind()==kind::SEP_WAND ){
-              use_s_lbl = getLabel( s_atom, 1, s_lbl );
-            }
-            Trace("sep-process") << "--> Active negated atom : " << s_atom << ", lbl = " << use_s_lbl << std::endl;
-            //add refinement lemma
-            if( d_label_map.find( s_atom )!=d_label_map.end() ){
-              TypeNode tn = getReferenceType( s_atom );
-              tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
-              Trace("sep-process") << "    overall model : " << std::endl;
-              debugPrintHeap( d_label_model[use_s_lbl], "sep-process" );
-
-              //get model values
-              std::map< int, Node > mvals;
-              for( std::map< int, Node >::iterator itl = d_label_map[s_atom].begin(); itl != d_label_map[s_atom].end(); ++itl ){
-                Node sub_lbl = itl->second;
-                int sub_index = itl->first;
-                computeLabelModel( sub_lbl );
-                Node lbl_mval = d_label_model[sub_lbl].getValue( tn );
-                Trace("sep-process") << "  child " << sub_index << " : " << sub_lbl << ", mval = " << lbl_mval << ", strict = " << d_label_model[sub_lbl].d_strict << std::endl;
-                mvals[sub_index] = lbl_mval;
+      for( unsigned r=0; r<2; r++ ){
+        for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
+          Node fact = (*i);
+          bool polarity = fact.getKind() != kind::NOT;
+          TNode atom = polarity ? fact : fact[0];
+          TNode s_atom = atom[0];
+          //process PTO first
+          if( (s_atom.getKind()==kind::SEP_PTO)==(r==0) ){
+            bool use_polarity = s_atom.getKind()==kind::SEP_WAND ? !polarity : polarity;
+            Trace("sep-process-debug") << "  check atom : " << s_atom << " use polarity " << use_polarity << std::endl;
+            if( use_polarity ){
+              if( s_atom.getKind()==kind::SEP_PTO ){
+                Trace("sep-inst") << "Pto : " << s_atom[0] << " -> " << s_atom[1] << std::endl;
+                pto_model[s_atom[0]] = s_atom[1];
               }
-
-              std::vector< Node > conc;
-              for( std::map< int, Node >::iterator itl = d_label_map[s_atom].begin(); itl != d_label_map[s_atom].end(); ++itl ){
-                int sub_index = itl->first;
-                std::map< Node, Node > visited;
-                Node c = applyLabel( s_atom[itl->first], mvals[sub_index], visited );
-                Trace("sep-process-debug") << "    applied inst : " << c << std::endl;
-                if( s_atom.getKind()==kind::SEP_STAR || sub_index==0 ){
-                  conc.push_back( c.negate() );
-                }else{
-                  conc.push_back( c );
-                }
-              }
-
-              // Now, assert model-instantiated implication based on the negation
-              Node o_b_lbl_mval = d_label_model[s_lbl].getValue( tn );
-              std::vector< Node > lemc;
-              Node pol_atom = atom;
-              if( polarity ){
-                pol_atom = atom.negate();
-              }
-              lemc.push_back( pol_atom );
-              lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
-              lemc.insert( lemc.end(), conc.begin(), conc.end() );
-              Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
-              Trace("sep-lemma") << "Sep::Lemma : negated star/wand refinement : " << lem << std::endl;
-              d_out->lemma( lem );
-              addedLemma = true;
             }else{
-              Trace("sep-process-debug") << "  no children." << std::endl;
-              Assert( s_atom.getKind()==kind::SEP_PTO );
+              Assert( assert_active.find( fact )!=assert_active.end() );
+              if( assert_active[fact] ){
+                Assert( atom.getKind()==kind::SEP_LABEL );
+                TNode s_lbl = atom[1];
+                Node use_s_lbl = s_lbl;
+                if( s_atom.getKind()==kind::SEP_WAND ){
+                  use_s_lbl = getLabel( s_atom, 1, s_lbl );
+                }
+                Trace("sep-process") << "--> Active negated atom : " << s_atom << ", lbl = " << use_s_lbl << std::endl;
+                //add refinement lemma
+                if( d_label_map[s_atom].find( s_lbl )!=d_label_map[s_atom].end() ){
+                  TypeNode tn = getReferenceType( s_atom );
+                  tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
+                  Trace("sep-process") << "    overall model : " << std::endl;
+                  debugPrintHeap( d_label_model[use_s_lbl], "sep-process" );
+
+                  //get model values
+                  std::map< int, Node > mvals;
+                  for( std::map< int, Node >::iterator itl = d_label_map[s_atom][s_lbl].begin(); itl != d_label_map[s_atom][s_lbl].end(); ++itl ){
+                    Node sub_lbl = itl->second;
+                    int sub_index = itl->first;
+                    computeLabelModel( sub_lbl );
+                    Node lbl_mval = d_label_model[sub_lbl].getValue( tn );
+                    Trace("sep-process") << "  child " << sub_index << " : " << sub_lbl << ", mval = " << lbl_mval << ", strict = " << d_label_model[sub_lbl].d_strict << std::endl;
+                    mvals[sub_index] = lbl_mval;
+                  }
+      
+                  // Now, assert model-instantiated implication based on the negation
+                  Assert( d_label_model.find( s_lbl )!=d_label_model.end() );
+                  Node o_b_lbl_mval = d_label_model[s_lbl].getValue( tn );
+                  std::vector< Node > conc;
+                  if( !options::sepExp() ){
+                    //old refinement lemmas
+                    for( std::map< int, Node >::iterator itl = d_label_map[s_atom][s_lbl].begin(); itl != d_label_map[s_atom][s_lbl].end(); ++itl ){
+                      int sub_index = itl->first;
+                      std::map< Node, Node > visited;
+                      Node c = applyLabel( s_atom[itl->first], mvals[sub_index], visited );
+                      Trace("sep-process-debug") << "    applied inst : " << c << std::endl;
+                      if( s_atom.getKind()==kind::SEP_STAR || sub_index==0 ){
+                        conc.push_back( c.negate() );
+                      }else{
+                        conc.push_back( c );
+                      }
+                    }
+                  }else{
+                    //new refinement
+                    std::map< Node, Node > visited;
+                    Node inst = instantiateLabel( s_atom, s_lbl, o_b_lbl_mval, visited, pto_model, tn );
+                    Trace("sep-process-debug") << "    applied inst : " << inst << std::endl;
+                    conc.push_back( inst );
+                  }
+                  std::vector< Node > lemc;
+                  Node pol_atom = atom;
+                  if( polarity ){
+                    pol_atom = atom.negate();
+                  }
+                  lemc.push_back( pol_atom );
+                  lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
+                  lemc.insert( lemc.end(), conc.begin(), conc.end() );
+                  Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
+                  Trace("sep-lemma") << "Sep::Lemma : negated star/wand refinement : " << lem << std::endl;
+                  d_out->lemma( lem );
+                  addedLemma = true;
+                }else{
+                  Trace("sep-process-debug") << "  no children." << std::endl;
+                  Assert( s_atom.getKind()==kind::SEP_PTO );
+                }
+              }else{
+                Trace("sep-process-debug") << "--> inactive negated assertion " << s_atom << std::endl;
+              }
             }
-          }else{
-            Trace("sep-process-debug") << "--> inactive negated assertion " << s_atom << std::endl;
           }
         }
       }
@@ -777,8 +791,8 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
 }
 
 Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
-  std::map< int, Node >::iterator it = d_label_map[atom].find( child );
-  if( it==d_label_map[atom].end() ){
+  std::map< int, Node >::iterator it = d_label_map[atom][lbl].find( child );
+  if( it==d_label_map[atom][lbl].end() ){
     TypeNode refType = getReferenceType( atom );
     std::stringstream ss;
     //if( lbl.isNull() ){
@@ -788,7 +802,7 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
     ss << "__Lc" << child;
     TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(refType));
     Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
-    d_label_map[atom][child] = n_lbl;
+    d_label_map[atom][lbl][child] = n_lbl;
     return n_lbl;
   }else{
     return (*it).second;
@@ -826,6 +840,72 @@ Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) 
   }
 }
 
+Node TheorySep::instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, TypeNode rtn ) {
+  Trace("sep-inst-debug") << "Instantiate label " << n << " " << lbl << " " << lbl_v << std::endl;
+  Assert( n.getKind()!=kind::SEP_LABEL );
+  if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ){
+    std::vector< Node > children;
+    children.resize( n.getNumChildren() );
+    Assert( d_label_map[n].find( lbl )!=d_label_map[n].end() );
+    for( std::map< int, Node >::iterator itl = d_label_map[n][lbl].begin(); itl != d_label_map[n][lbl].end(); ++itl ){
+      Node sub_lbl = itl->second;
+      int sub_index = itl->first;
+      Assert( sub_index>=0 && sub_index<(int)children.size() );
+     // computeLabelModel( sub_lbl );
+      Assert( d_label_model.find( sub_lbl )!=d_label_model.end() );
+      Node lbl_mval = d_label_model[sub_lbl].getValue( rtn );
+      Trace("sep-inst") << "Model for " << sub_lbl << " : " << lbl_mval << std::endl;
+      children[sub_index] = instantiateLabel( n[sub_index], sub_lbl, lbl_mval, visited, pto_model, rtn );
+    }
+    if( n.getKind()==kind::SEP_STAR ){
+      Assert( children.size()>1 );
+      return NodeManager::currentNM()->mkNode( kind::AND, children );      
+    }else{
+      return NodeManager::currentNM()->mkNode( kind::OR, children[0].negate(), children[1] );
+    }
+  }else if( n.getKind()==kind::SEP_PTO ){
+    if( lbl_v.getKind()==kind::SINGLETON ){
+      if( Trace.isOn("sep-inst") ){
+        if( pto_model.find( lbl_v[0] )!=pto_model.end() ){
+          Trace("sep-inst") << "Pto model for " << lbl_v[0] << " is " << pto_model[lbl_v[0]] << std::endl;
+        }else{
+          Trace("sep-inst") << "Pto model for " << lbl_v[0] << " cannot be found. " << std::endl;
+        }
+      }
+      Assert( pto_model.find( lbl_v[0] )!=pto_model.end() );
+      Node mv = pto_model[lbl_v[0]];
+      return NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], mv );
+    }else{
+      return NodeManager::currentNM()->mkConst( false );
+    }
+  }else if( n.getKind()==kind::EMP_STAR ){
+    return NodeManager::currentNM()->mkConst( lbl_v.getKind()==kind::EMPTYSET );
+  }else{
+    std::map< Node, Node >::iterator it = visited.find( n );
+    if( it==visited.end() ){
+      std::vector< Node > children;
+      if (n.getMetaKind() == kind::metakind::PARAMETERIZED) {
+        children.push_back( n.getOperator() );
+      }
+      bool childChanged = false;
+      for( unsigned i=0; i<n.getNumChildren(); i++ ){
+        Node aln = instantiateLabel( n[i], lbl, lbl_v, visited, pto_model, rtn );
+        children.push_back( aln );
+        childChanged = childChanged || aln!=n[i];
+      }
+      Node ret = n;
+      if( childChanged ){
+        ret = NodeManager::currentNM()->mkNode( n.getKind(), children );
+      }
+      //careful about caching
+      //visited[n] = ret;
+      return ret;
+    }else{
+      return it->second;
+    }
+  }
+}
+
 void TheorySep::getLabelChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels ) {
   for( unsigned i=0; i<atom.getNumChildren(); i++ ){
     Node lblc = getLabel( atom, i, lbl );
@@ -847,7 +927,7 @@ void TheorySep::getSubLabels( Node atom, Node lbl, std::vector< Node >& labels, 
   Assert( std::find( d_label_model[lbl].d_heap_active_assertions.begin(),
                      d_label_model[lbl].d_heap_active_assertions.end(), atom )!=d_label_model[lbl].d_heap_active_assertions.end() );
   if( atom.getKind()==kind::SEP_STAR ){
-    for( std::map< int, Node >::iterator itl = d_label_map[atom].begin(); itl != d_label_map[atom].end(); ++itl ){
+    for( std::map< int, Node >::iterator itl = d_label_map[atom][lbl].begin(); itl != d_label_map[atom][lbl].end(); ++itl ){
       Trace("sep-process-model-debug") << "  child " << itl->first << " of atom " << atom << " : " << itl->second << std::endl;
       labels.push_back( itl->second );
       lindex.push_back( itl->first );
@@ -855,7 +935,7 @@ void TheorySep::getSubLabels( Node atom, Node lbl, std::vector< Node >& labels, 
   }else{
     Assert( atom.getKind()==kind::SEP_WAND );
     Assert( d_label_model[lbl].d_wand_to_base_label.find( atom )!=d_label_model[lbl].d_wand_to_base_label.end() );
-    labels.push_back( d_label_map[atom][0] );
+    labels.push_back( d_label_map[atom][lbl][0] );
     lindex.push_back( 0 );
     labels.push_back( d_label_model[lbl].d_wand_to_base_label[atom] );
     lindex.push_back( -1 );

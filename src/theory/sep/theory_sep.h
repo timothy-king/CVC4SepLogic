@@ -195,7 +195,7 @@ class TheorySep : public Theory {
   NodeList d_spatial_assertions;
 
   std::map< TypeNode, Node > d_base_label;
-  std::map< Node, std::map< int, Node > > d_label_map;
+  std::map< Node, std::map< Node, std::map< int, Node > > > d_label_map;
   //reference bound
   std::map< TypeNode, Node > d_reference_bound;
   std::map< TypeNode, Node > d_reference_bound_max;
@@ -249,6 +249,7 @@ class TheorySep : public Theory {
   void mergePto( Node p1, Node p2 );
   void computeLabelModel( Node lbl );
   void addHeapLocToLabel( Node lbl, Node atom, Node loc, Node loc_r );
+  Node instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, TypeNode rtn );
 
   //hack FIXME
   TheoryModel* d_last_model;

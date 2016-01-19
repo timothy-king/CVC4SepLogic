@@ -8,4 +8,7 @@ module SEP "theory/sep/options.h" Sep theory
 option sepCheckNeg --sep-check-neg bool :default true
  check negated spatial assertions
 
+option sepExp --sep-exp bool :default false
+ experimental flag for sep
+
 endmodule
