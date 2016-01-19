@@ -1,5 +1,7 @@
+; COMMAND-LINE: --no-check-models
+; EXPECT: sat
 (set-logic ALL_SUPPORTED)
-
+(set-info :status sat)
 (declare-sort U 0)
 (declare-fun x () (Ref U))
 (declare-fun y () (Ref U))

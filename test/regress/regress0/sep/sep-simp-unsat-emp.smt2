@@ -1,4 +1,5 @@
 (set-logic ALL_SUPPORTED)
+(set-info :status unsat)
 
 (declare-sort U 0)
 (declare-fun x () (Ref U))

@@ -1,4 +1,5 @@
-
+; COMMAND-LINE: --no-check-models
+; EXPECT: sat
 (set-logic ALL_SUPPORTED)
 (set-info :status sat)
 
