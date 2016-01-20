@@ -29,7 +29,6 @@ TESTS =	\
   sep-neg-nstrict.smt2 \
   sep-plus1.smt2 \
   sep-nterm-val-model.smt2 \
-  split-find-unsat.smt2 \
   split-find-unsat-w-emp.smt2 \
   crash1220.smt2 \
   nspatial-simp.smt2 \
@@ -37,20 +36,18 @@ TESTS =	\
   sep-neg-simple.smt2 \
   sep-simp-unc.smt2 \
   sep-simp-unsat-emp.smt2 \
-  simple-neg-sat.smt2
+  simple-neg-sat.smt2 \
+  wand-simp-sat.smt2 \
+  wand-simp-sat2.smt2 \
+  wand-simp-unsat.smt2
   
 
 
 FAILING_TESTS =
 # sep-nterm-again.smt2
 # loop-1220.smt2
+# split-find-unsat.smt2
 
-#  failing for --sep-exp:
-# sep-neg-1refine.smt2 
-# split-find-unsat-w-emp.smt2
-#sep-nterm-val-model.smt2
-# sep-neg-nstrict.smt2
-# sep-03.smt2
 EXTRA_DIST = $(TESTS)
 
 #   slow after changes on Nov 20 : artemis-0512-nonterm.smt2
