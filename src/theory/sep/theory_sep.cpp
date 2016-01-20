@@ -525,8 +525,9 @@ void TheorySep::check(Effort e) {
             Trace("sep-process-debug") << "  check atom : " << s_atom << " use polarity " << use_polarity << std::endl;
             if( use_polarity ){
               if( s_atom.getKind()==kind::SEP_PTO ){
-                Trace("sep-inst") << "Pto : " << s_atom[0] << " -> " << s_atom[1] << std::endl;
-                pto_model[s_atom[0]] = s_atom[1];
+                Node vv = d_last_model->getRepresentative( s_atom[0] );
+                Trace("sep-inst") << "Pto : " << s_atom[0] << " (val=" << vv << ") -> " << s_atom[1] << std::endl;
+                pto_model[vv] = s_atom[1];
               }
             }else{
               Assert( assert_active.find( fact )!=assert_active.end() );
@@ -609,12 +610,12 @@ void TheorySep::check(Effort e) {
         for( std::map< TypeNode, Node >::iterator it = d_base_label.begin(); it != d_base_label.end(); ++it ){
           //, (label = " << it->second << ")
           Trace("sep-model") << "Model for heap, type = " << it->first << " : " << std::endl;
-          if( d_label_model[it->second].d_heap_locs.empty() ){
+          if( d_label_model[it->second].d_heap_locs_model.empty() ){
             Trace("sep-model") << "  [empty]" << std::endl;
           }else{
-            for( unsigned j=0; j<d_label_model[it->second].d_heap_locs.size(); j++ ){
-              Assert( d_label_model[it->second].d_heap_locs[j].getKind()==kind::SINGLETON );
-              Node l = d_label_model[it->second].d_heap_locs[j][0];
+            for( unsigned j=0; j<d_label_model[it->second].d_heap_locs_model.size(); j++ ){
+              Assert( d_label_model[it->second].d_heap_locs_model[j].getKind()==kind::SINGLETON );
+              Node l = d_label_model[it->second].d_heap_locs_model[j][0];
               Trace("sep-model") << "  " << l << " -> ";
               if( pto_model[l].isNull() ){
                 Trace("sep-model") << "_";
@@ -868,10 +869,10 @@ Node TheorySep::instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, 
     }
   }else if( n.getKind()==kind::SEP_PTO ){
     if( lbl_v.getKind()==kind::SINGLETON ){
-      std::map< Node, Node >::iterator it = pto_model.find( lbl_v[0] );
+      Node vv = d_last_model->getRepresentative( lbl_v[0] );
+      std::map< Node, Node >::iterator it = pto_model.find( vv );
       if( it!=pto_model.end() ){
-        Trace("sep-inst") << "Pto model for " << lbl_v[0] << " is " << it->second << std::endl;
-        Node mv = pto_model[lbl_v[0]];
+        Trace("sep-inst") << "Pto model for " << lbl_v[0] << " (val=" << vv << ") is " << it->second << std::endl;
         return NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second );
       }else{
         Trace("sep-inst") << "Pto model for " << lbl_v[0] << " cannot be found. " << std::endl;
@@ -1287,6 +1288,7 @@ void TheorySep::debugPrintHeap( HeapInfo& heap, const char * c ) {
 }
 
 Node TheorySep::HeapInfo::getValue( TypeNode tn ) {
+  //Assert( d_heap_locs.size()==d_heap_locs_model.size() );
   if( d_heap_locs.empty() ){
     return NodeManager::currentNM()->mkConst(EmptySet(tn.toType()));
   }else if( d_heap_locs.size()==1 ){
