@@ -249,7 +249,7 @@ class TheorySep : public Theory {
   void mergePto( Node p1, Node p2 );
   void computeLabelModel( Node lbl );
   void addHeapLocToLabel( Node lbl, Node atom, Node loc, Node loc_r );
-  Node instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, TypeNode rtn, std::vector< Node >& assump );
+  Node instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, TypeNode rtn, std::vector< Node >& assump, unsigned ind = 0 );
 
   //hack FIXME
   TheoryModel* d_last_model;

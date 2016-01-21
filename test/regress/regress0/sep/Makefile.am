@@ -39,12 +39,12 @@ TESTS =	\
   simple-neg-sat.smt2 \
   wand-simp-sat.smt2 \
   wand-simp-sat2.smt2 \
-  wand-simp-unsat.smt2
-  
+  wand-simp-unsat.smt2 \
+  sep-nterm-again.smt2 \
+  split-find-unsat.smt2
 
 
 FAILING_TESTS =
-# sep-nterm-again.smt2
 # loop-1220.smt2
 # split-find-unsat.smt2
 
