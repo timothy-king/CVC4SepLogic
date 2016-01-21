@@ -898,7 +898,7 @@ Node TheorySep::instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, 
       int sub_index = itl->first;
       Assert( sub_index>=0 && sub_index<(int)children.size() );
       Trace("sep-inst-debug") << "Sublabel " << sub_index << " is " << sub_lbl << std::endl;
-      //computeLabelModel( sub_lbl, tmodel );
+      computeLabelModel( sub_lbl, tmodel );
       Assert( d_label_model.find( sub_lbl )!=d_label_model.end() );
       Node lbl_mval = d_label_model[sub_lbl].getValue( rtn );
       if( Trace.isOn("sep-inst") ){
@@ -968,18 +968,6 @@ Node TheorySep::instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, 
     }
   }
 }
-
-/*
-void TheorySep::setInactiveLabelsRec( Node atom, Node lbl, std::vector< Node >& inactive_lbl ) {
-  if( std::find( inactive_lbl.begin(), inactive_lbl.end(), lbl ) ){
-    Trace("sep-process-debug") << "setInactiveLabelsRec::inactive : " << lbl << std::endl;
-  }
-  for( unsigned i=0; i<atom.getNumChildren(); i++ ){
-    Node lblc = getLabel( atom, i, lbl );
-    setInactiveLabelsRec( lblc, inactive_lbl );
-  }
-}
-*/
 
 void TheorySep::setInactiveAssertionRec( Node fact, std::map< Node, std::vector< Node > >& lbl_to_assertions, std::map< Node, bool >& assert_active ) {
   Trace("sep-process-debug") << "setInactiveAssertionRec::inactive : " << fact << std::endl;
@@ -1059,9 +1047,13 @@ void TheorySep::computeLabelModel( Node lbl, std::map< Node, Node >& tmodel ) {
       Node tt;
       std::map< Node, Node >::iterator itm = tmodel.find( u );
       if( itm==tmodel.end() ) {
-        Trace("sep-process") << "WARNING: could not find symbolic term in model for " << u << std::endl;
+        //Trace("sep-process") << "WARNING: could not find symbolic term in model for " << u << std::endl;
         //Assert( false );
-        tt = u;
+        //tt = u;
+        TypeNode tn = u.getType().getRefConstituentType();
+        Trace("sep-process") << "WARNING: could not find symbolic term in model for " << u << ", cref type " << tn << std::endl;
+        Assert( d_type_references.find( tn )!=d_type_references.end() && !d_type_references[tn].empty() );
+        tt = d_type_references[tn][0];
       }else{
         tt = itm->second;
       }

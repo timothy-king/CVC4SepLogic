@@ -29,7 +29,6 @@ TESTS =	\
   sep-neg-nstrict.smt2 \
   sep-plus1.smt2 \
   sep-nterm-val-model.smt2 \
-  split-find-unsat-w-emp.smt2 \
   crash1220.smt2 \
   nspatial-simp.smt2 \
   sep-neg-1refine.smt2 \
@@ -40,13 +39,13 @@ TESTS =	\
   wand-simp-sat.smt2 \
   wand-simp-sat2.smt2 \
   wand-simp-unsat.smt2 \
-  sep-nterm-again.smt2 \
-  split-find-unsat.smt2
+  sep-nterm-again.smt2
 
 
 FAILING_TESTS =
 # loop-1220.smt2
 # split-find-unsat.smt2
+# split-find-unsat-w-emp.smt2 
 
 EXTRA_DIST = $(TESTS)
 

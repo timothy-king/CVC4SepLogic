@@ -251,7 +251,6 @@ class TheorySep : public Theory {
   void computeLabelModel( Node lbl, std::map< Node, Node >& tmodel );
   Node instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, std::map< Node, Node >& tmodel, 
                          TypeNode rtn, std::vector< Node >& assump, unsigned ind = 0 );
-  //void setInactiveLabelsRec( Node lbl, std::vector< Node >& inactive_lbl );
   void setInactiveAssertionRec( Node fact, std::map< Node, std::vector< Node > >& lbl_to_assertions, std::map< Node, bool >& assert_active );
 
   //hack FIXME
