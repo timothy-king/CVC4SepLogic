@@ -196,6 +196,7 @@ class TheorySep : public Theory {
 
   std::map< TypeNode, Node > d_base_label;
   std::map< Node, std::map< Node, std::map< int, Node > > > d_label_map;
+  std::map< Node, Node > d_label_map_parent;
   //reference bound
   std::map< TypeNode, Node > d_reference_bound;
   std::map< TypeNode, Node > d_reference_bound_max;
@@ -247,9 +248,11 @@ class TheorySep : public Theory {
   void validatePto( HeapAssertInfo * ei, Node ei_n );
   void addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity );
   void mergePto( Node p1, Node p2 );
-  void computeLabelModel( Node lbl );
-  void addHeapLocToLabel( Node lbl, Node atom, Node loc, Node loc_r );
-  Node instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, TypeNode rtn, std::vector< Node >& assump, unsigned ind = 0 );
+  void computeLabelModel( Node lbl, std::map< Node, Node >& tmodel );
+  Node instantiateLabel( Node n, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, std::map< Node, Node >& tmodel, 
+                         TypeNode rtn, std::vector< Node >& assump, unsigned ind = 0 );
+  //void setInactiveLabelsRec( Node lbl, std::vector< Node >& inactive_lbl );
+  void setInactiveAssertionRec( Node fact, std::map< Node, std::vector< Node > >& lbl_to_assertions, std::map< Node, bool >& assert_active );
 
   //hack FIXME
   TheoryModel* d_last_model;
