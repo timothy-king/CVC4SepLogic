@@ -41,7 +41,11 @@ TESTS =	\
   wand-simp-unsat.smt2 \
   sep-nterm-again.smt2 \
   split-find-unsat.smt2 \
-  split-find-unsat-w-emp.smt2 
+  split-find-unsat-w-emp.smt2 \
+  nemp.smt2 \
+  wand-crash.smt2 \
+  wand-nterm-simp.smt2 \
+  wand-nterm-simp2.smt2 
 
 
 FAILING_TESTS =

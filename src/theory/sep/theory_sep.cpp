@@ -456,7 +456,7 @@ void TheorySep::check(Effort e) {
     }
     Trace("sep-process") << "---Locations---" << std::endl;
     std::map< Node, Node > tmodel;
-    for( std::map< TypeNode, std::vector< Node > >::iterator itt = d_type_references.begin(); itt != d_type_references.end(); ++itt ){
+    for( std::map< TypeNode, std::vector< Node > >::iterator itt = d_type_references_all.begin(); itt != d_type_references_all.end(); ++itt ){
       for( unsigned k=0; k<itt->second.size(); k++ ){
         Node t = itt->second[k];
         Trace("sep-process") << "  " << t << " -> ";
@@ -777,19 +777,18 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     std::stringstream ss2;
     ss2 << "__Lu";
     d_reference_bound[tn] = NodeManager::currentNM()->mkSkolem( ss2.str(), ltn, "" );
-    std::vector< Node > trs;
-    trs.insert( trs.end(), d_type_references[tn].begin(), d_type_references[tn].end() );
+    d_type_references_all[tn].insert( d_type_references_all[tn].end(), d_type_references[tn].begin(), d_type_references[tn].end() );
     //add a reference type for maximum occurrences of empty in a constraint
     unsigned n_emp = d_emp_occ_max[tn]>d_emp_occ_max[TypeNode::null()] ? d_emp_occ_max[tn] : d_emp_occ_max[TypeNode::null()];
     for( unsigned r=0; r<n_emp; r++ ){
-      trs.push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
+      d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
     }
     //construct bound
-    if( trs.empty() ){
+    if( d_type_references_all[tn].empty() ){
       d_reference_bound_max[tn] = NodeManager::currentNM()->mkConst(EmptySet(ltn.toType()));
     }else{
-      for( unsigned i=0; i<trs.size(); i++ ){
-        Node s = trs[i];
+      for( unsigned i=0; i<d_type_references_all[tn].size(); i++ ){
+        Node s = d_type_references_all[tn][i];
         Assert( !s.isNull() );
         s = NodeManager::currentNM()->mkNode( kind::SINGLETON, s );
         if( d_reference_bound_max[tn].isNull() ){
@@ -1029,8 +1028,8 @@ void TheorySep::computeLabelModel( Node lbl, std::map< Node, Node >& tmodel ) {
         //tt = u;
         TypeNode tn = u.getType().getRefConstituentType();
         Trace("sep-process") << "WARNING: could not find symbolic term in model for " << u << ", cref type " << tn << std::endl;
-        Assert( d_type_references.find( tn )!=d_type_references.end() && !d_type_references[tn].empty() );
-        tt = d_type_references[tn][0];
+        Assert( d_type_references_all.find( tn )!=d_type_references_all.end() && !d_type_references_all[tn].empty() );
+        tt = d_type_references_all[tn][0];
       }else{
         tt = itm->second;
       }
