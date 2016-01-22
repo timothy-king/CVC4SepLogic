@@ -534,7 +534,7 @@ void TheorySep::check(Effort e) {
               TypeNode tn = getReferenceType( s_atom );
               tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
               Node o_b_lbl_mval = d_label_model[s_lbl].getValue( tn );
-              Trace("sep-process") << "    Model : " << o_b_lbl_mval << std::endl;
+              Trace("sep-process") << "    Model for " << s_lbl << " : " << o_b_lbl_mval << std::endl;
 
               //get model values
               std::map< int, Node > mvals;
@@ -868,40 +868,51 @@ Node TheorySep::instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std:
     bool addAssump = std::find( d_label_model[o_lbl].d_heap_locs_model.begin(), d_label_model[o_lbl].d_heap_locs_model.end(), svr )!=d_label_model[o_lbl].d_heap_locs_model.end();
     Trace("sep-inst-debug") << "Is assumption required : " << addAssump << " for value ref " << vr << " in " << o_lbl << std::endl;
     if( Trace.isOn("sep-inst") ){
-      for( unsigned j=0; j<ind; j++ ){ Trace("sep-inst") << "  "; }
+      for( unsigned j=0; j<(ind+1); j++ ){ Trace("sep-inst") << "  "; }
     }
     if( lbl_v.getKind()==kind::SINGLETON ){
       Node vv = d_last_model->getRepresentative( lbl_v[0] );
-      std::map< Node, Node >::iterator it = pto_model.find( vv );
-      if( it!=pto_model.end() ){
-        Trace("sep-inst") << "Pto " << lbl_v[0] << " (val=" << vv << ") = " << it->second << std::endl;
-        if( addAssump ){          
+      if( vv!=vr ){
+        Trace("sep-inst") << "pto disequal reference." << std::endl;
+        if( addAssump ){      
           //add to assumption
-          Node a = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], it->second ), NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ) );
-          Trace("sep-inst-debug") << "Assumption : " << a << std::endl;
-          assump.push_back( a.negate() );
-        }
-        std::vector< Node > children;
-        if( n[0]!=lbl_v[0] ){
-          children.push_back( NodeManager::currentNM()->mkNode( kind::EQUAL, n[0], lbl_v[0] ) );
-        }
-        if( n[1]!=it->second ){
-          children.push_back( NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second ) );
-        }
-        return children.empty() ? NodeManager::currentNM()->mkConst( true ) : ( children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children ) );
-      }else{
-        Trace("sep-inst") << "Pto " << lbl_v[0] << " = null." << std::endl;
-        if( addAssump ){
-          //add to assumption
-          Node a = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], n[1] ), NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ) );
-          //Node a = NodeManager::currentNM()->mkNode( kind::MEMBER, n[0], o_lbl );
-          Trace("sep-inst-debug") << "Assumption : " << a.negate() << std::endl;
+          Node a = n[0].eqNode( lbl_v[0] );
+          Trace("sep-inst") << "=> Assumption : " << a.negate() << std::endl;
           assump.push_back( a );
         }
         return NodeManager::currentNM()->mkConst( false );
+      }else{
+        std::map< Node, Node >::iterator it = pto_model.find( vv );
+        if( it!=pto_model.end() ){
+          Trace("sep-inst") << "pto " << lbl_v[0] << " (val=" << vv << ") = " << it->second << std::endl;
+          if( addAssump ){          
+            //add to assumption
+            Node a = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], it->second ), NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ) );
+            Trace("sep-inst") << "=> Assumption : " << a << std::endl;
+            assump.push_back( a.negate() );
+          }
+          std::vector< Node > children;
+          if( n[0]!=lbl_v[0] ){
+            children.push_back( NodeManager::currentNM()->mkNode( kind::EQUAL, n[0], lbl_v[0] ) );
+          }
+          if( n[1]!=it->second ){
+            children.push_back( NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second ) );
+          }
+          return children.empty() ? NodeManager::currentNM()->mkConst( true ) : ( children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children ) );
+        }else{
+          Trace("sep-inst") << "pto " << lbl_v[0] << " = null." << std::endl;
+          if( addAssump ){
+            //add to assumption
+            Node a = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], n[1] ), NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ) );
+            //Node a = NodeManager::currentNM()->mkNode( kind::MEMBER, n[0], o_lbl );
+            Trace("sep-inst") << "=> Assumption : " << a.negate() << std::endl;
+            assump.push_back( a );
+          }
+          return NodeManager::currentNM()->mkConst( false );
+        }
       }
     }else{
-      Trace("sep-inst") << "Pto bad cardinality : " << lbl_v << std::endl;
+      Trace("sep-inst") << "pto bad cardinality : " << lbl_v << std::endl;
       return NodeManager::currentNM()->mkConst( false );
     }
   }else if( n.getKind()==kind::EMP_STAR ){
@@ -1082,14 +1093,14 @@ void TheorySep::validatePto( HeapAssertInfo * ei, Node ei_n ) {
 }
 
 void TheorySep::addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity ) {
-  Trace("sep-pto") << "Add pto : " << p << ", pol = " << polarity << " to eqc " << ei_n << std::endl;
+  Trace("sep-pto") << "Add pto " << p << ", pol = " << polarity << " to eqc " << ei_n << std::endl;
   if( !ei->d_pto.get().isNull() ){
     if( polarity ){
       Trace("sep-pto-debug") << "...eqc " << ei_n << " already has pto " << ei->d_pto.get() << ", merge." << std::endl;
       mergePto( ei->d_pto.get(), p );
     }else{
       Node pb = ei->d_pto.get();
-      Trace("sep-pto") << "Process positive/negated pto : " << " " << pb << " " << p << std::endl;
+      Trace("sep-pto") << "Process positive/negated pto " << " " << pb << " " << p << std::endl;
       Assert( pb.getKind()==kind::SEP_LABEL && pb[0].getKind()==kind::SEP_PTO );
       Assert( p.getKind()==kind::SEP_LABEL && p[0].getKind()==kind::SEP_PTO );
       Assert( areEqual( pb[0][0], p[0][0] ) );
@@ -1120,7 +1131,7 @@ void TheorySep::addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity ) 
 }
 
 void TheorySep::mergePto( Node p1, Node p2 ) {
-  Trace("sep-lemma-debug") << "Merge pto : " << p1 << " " << p2 << std::endl;
+  Trace("sep-lemma-debug") << "Merge pto " << p1 << " " << p2 << std::endl;
   Assert( p1.getKind()==kind::SEP_LABEL && p1[0].getKind()==kind::SEP_PTO );
   Assert( p2.getKind()==kind::SEP_LABEL && p2[0].getKind()==kind::SEP_PTO );
   if( !areEqual( p1[0][1], p2[0][1] ) ){

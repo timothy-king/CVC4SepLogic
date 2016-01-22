@@ -40,6 +40,7 @@ TESTS =	\
   wand-simp-sat2.smt2 \
   wand-simp-unsat.smt2 \
   sep-nterm-again.smt2 \
+  split-find-unsat.smt2 \
   split-find-unsat-w-emp.smt2 \
   nemp.smt2 \
   wand-crash.smt2 \
@@ -49,7 +50,6 @@ TESTS =	\
 
 FAILING_TESTS =
 # loop-1220.smt2 (slow)
-# split-find-unsat.smt2 
 
 EXTRA_DIST = $(TESTS)
 
