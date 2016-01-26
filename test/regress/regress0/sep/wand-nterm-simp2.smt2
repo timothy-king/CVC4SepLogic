@@ -2,5 +2,5 @@
 ; EXPECT: sat
 (set-logic ALL_SUPPORTED)
 (declare-fun x () (Ref Int))
-(assert (wand (pto x 1) (emp 0)))
+(assert (wand (pto x 1) (emp x)))
 (check-sat)

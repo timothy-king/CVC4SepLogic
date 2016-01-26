@@ -47,13 +47,14 @@ struct SepPtoTypeRule {
     Assert(n.getKind() == kind::SEP_PTO);
     if( check ) {
       TypeNode refType = n[0].getType(check);
-      if(!refType.isRef()) {
-        throw TypeCheckingExceptionPrivate(n, "pto applied to non-reference term");
-      }
+      //SEP-POLY
+      //if(!refType.isRef()) {
+      //  throw TypeCheckingExceptionPrivate(n, "pto applied to non-reference term");
+      //}
       TypeNode ptType = n[1].getType(check);
-      if(!ptType.isComparableTo(refType.getRefConstituentType())){
-        throw TypeCheckingExceptionPrivate(n, "pto maps reference to term of different type");
-      }
+      //if(!ptType.isComparableTo(refType.getRefConstituentType())){
+      //  throw TypeCheckingExceptionPrivate(n, "pto maps reference to term of different type");
+      //}
     }
     return nodeManager->booleanType();
   }

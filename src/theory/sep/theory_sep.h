@@ -194,9 +194,10 @@ class TheorySep : public Theory {
   NodeList d_infer_exp;
   NodeList d_spatial_assertions;
 
+  //currently fix one data type for each location type, throw error if using more than one
+  std::map< TypeNode, TypeNode > d_loc_to_data_type;
+  //information about types
   std::map< TypeNode, Node > d_base_label;
-  std::map< Node, std::map< Node, std::map< int, Node > > > d_label_map;
-  std::map< Node, Node > d_label_map_parent;
   //reference bound
   std::map< TypeNode, Node > d_reference_bound;
   std::map< TypeNode, Node > d_reference_bound_max;
@@ -205,6 +206,9 @@ class TheorySep : public Theory {
   std::map< TypeNode, unsigned > d_emp_occ_max;
   //for empty argument
   std::map< TypeNode, Node > d_emp_arg;
+  //map from ( atom, label, child index ) -> label
+  std::map< Node, std::map< Node, std::map< int, Node > > > d_label_map;
+  std::map< Node, Node > d_label_map_parent;
 
   class HeapAssertInfo {
   public:

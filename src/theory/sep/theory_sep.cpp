@@ -532,7 +532,9 @@ void TheorySep::check(Effort e) {
             //add refinement lemma
             if( d_label_map[s_atom].find( s_lbl )!=d_label_map[s_atom].end() ){
               TypeNode tn = getReferenceType( s_atom );
-              tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
+              //SEP-POLY
+              tn = NodeManager::currentNM()->mkSetType(tn);
+              //tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
               Node o_b_lbl_mval = d_label_model[s_lbl].getValue( tn );
               Trace("sep-process") << "    Model for " << s_lbl << " : " << o_b_lbl_mval << std::endl;
 
@@ -705,7 +707,21 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
       if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
         d_references[atom].push_back( n[0] );
       }
-      return n[1].getType();
+      //SEP-POLY
+      TypeNode tn1 = n[0].getType();
+      TypeNode tn2 = n[1].getType();
+      std::map< TypeNode, TypeNode >::iterator itt = d_loc_to_data_type.find( tn1 );
+      if( itt==d_loc_to_data_type.end() ){
+        Trace("sep-type") << "Sep: assume location type " << tn1 << " is associated with data type " << tn2 << " (from " << atom << ")" << std::endl;
+        d_loc_to_data_type[tn1] = tn2;
+      }else{
+        if( itt->second!=tn2 ){
+          Trace("sep-type") << "ERROR: location type " << tn1 << " is already associated with data type " << tn2 << " (offending atom is " << atom << ")" << std::endl;
+          Assert( false );
+        }
+      }
+      return tn1;
+      //return n[1].getType();
     }else if( n.getKind()==kind::EMP_STAR ){
       d_references[atom].push_back( Node::null() );
       return n[0].getType();
@@ -738,7 +754,9 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     Trace("sep") << "Make base label for " << tn << std::endl;
     std::stringstream ss;
     ss << "__Lb";
-    TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
+    //SEP-POLY
+    TypeNode ltn = NodeManager::currentNM()->mkSetType(tn);
+    //TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
     Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_base_label[tn] = n_lbl;
     //make reference bound
@@ -750,7 +768,9 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     //add a reference type for maximum occurrences of empty in a constraint
     unsigned n_emp = d_emp_occ_max[tn]>d_emp_occ_max[TypeNode::null()] ? d_emp_occ_max[tn] : d_emp_occ_max[TypeNode::null()];
     for( unsigned r=0; r<n_emp; r++ ){
-      d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
+      //SEP-POLY
+      d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", tn ) );
+      //d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
     }
     //construct bound
     if( d_type_references_all[tn].empty() ){
@@ -784,12 +804,10 @@ Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
   if( it==d_label_map[atom][lbl].end() ){
     TypeNode refType = getReferenceType( atom );
     std::stringstream ss;
-    //if( lbl.isNull() ){
-    //}else{
-    //  ss << lbl;
-    //}
     ss << "__Lc" << child;
-    TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(refType));
+    //SEP-POLY
+    TypeNode ltn = NodeManager::currentNM()->mkSetType(refType);
+    //TypeNode ltn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(refType));
     Node n_lbl = NodeManager::currentNM()->mkSkolem( ss.str(), ltn, "" );
     d_label_map[atom][lbl][child] = n_lbl;
     d_label_map_parent[n_lbl] = lbl;
@@ -1004,7 +1022,9 @@ void TheorySep::computeLabelModel( Node lbl, std::map< Node, Node >& tmodel ) {
         //Trace("sep-process") << "WARNING: could not find symbolic term in model for " << u << std::endl;
         //Assert( false );
         //tt = u;
-        TypeNode tn = u.getType().getRefConstituentType();
+        //SEP-POLY
+        //TypeNode tn = u.getType().getRefConstituentType();
+        TypeNode tn = u.getType();
         Trace("sep-process") << "WARNING: could not find symbolic term in model for " << u << ", cref type " << tn << std::endl;
         Assert( d_type_references_all.find( tn )!=d_type_references_all.end() && !d_type_references_all[tn].empty() );
         tt = d_type_references_all[tn][0];
