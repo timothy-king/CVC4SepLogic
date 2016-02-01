@@ -515,6 +515,7 @@ void TheorySep::check(Effort e) {
     if( options::sepCheckNeg() ){
       //process spatial assertions
       bool addedLemma = false;
+      bool needAddLemma = false;
       for( NodeList::const_iterator i = d_spatial_assertions.begin(); i != d_spatial_assertions.end(); ++i ) {
         Node fact = (*i);
         bool polarity = fact.getKind() != kind::NOT;
@@ -531,6 +532,7 @@ void TheorySep::check(Effort e) {
             Trace("sep-process") << "--> Active negated atom : " << s_atom << ", lbl = " << s_lbl << std::endl;
             //add refinement lemma
             if( d_label_map[s_atom].find( s_lbl )!=d_label_map[s_atom].end() ){
+              needAddLemma = true;
               TypeNode tn = getReferenceType( s_atom );
               //SEP-POLY
               tn = NodeManager::currentNM()->mkSetType(tn);
@@ -552,6 +554,7 @@ void TheorySep::check(Effort e) {
               // Now, assert model-instantiated implication based on the negation
               Assert( d_label_model.find( s_lbl )!=d_label_model.end() );
               std::vector< Node > conc;
+              bool inst_success = true;
               if( options::sepExp() ){
                 //old refinement lemmas
                 for( std::map< int, Node >::iterator itl = d_label_map[s_atom][s_lbl].begin(); itl != d_label_map[s_atom][s_lbl].end(); ++itl ){
@@ -571,21 +574,26 @@ void TheorySep::check(Effort e) {
                 Node inst = instantiateLabel( s_atom, s_lbl, s_lbl, o_b_lbl_mval, visited, pto_model, tmodel, tn, conc );
                 Trace("sep-inst-debug") << "    applied inst : " << inst << std::endl;
                 inst = Rewriter::rewrite( inst );
+                if( inst==( polarity ? d_true : d_false ) ){
+                  inst_success = false;
+                }
                 conc.push_back( polarity ? inst : inst.negate() );
               }
-              std::vector< Node > lemc;
-              Node pol_atom = atom;
-              if( polarity ){
-                pol_atom = atom.negate();
+              if( inst_success ){
+                std::vector< Node > lemc;
+                Node pol_atom = atom;
+                if( polarity ){
+                  pol_atom = atom.negate();
+                }
+                lemc.push_back( pol_atom );
+                lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
+                lemc.insert( lemc.end(), conc.begin(), conc.end() );
+                Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
+                Trace("sep-process") << "-----> refinement lemma : " << lem << std::endl;
+                Trace("sep-lemma") << "Sep::Lemma : negated star/wand refinement : " << lem << std::endl;
+                d_out->lemma( lem );
+                addedLemma = true;
               }
-              lemc.push_back( pol_atom );
-              lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
-              lemc.insert( lemc.end(), conc.begin(), conc.end() );
-              Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
-              Trace("sep-process") << "-----> refinement lemma : " << lem << std::endl;
-              Trace("sep-lemma") << "Sep::Lemma : negated star/wand refinement : " << lem << std::endl;
-              d_out->lemma( lem );
-              addedLemma = true;
             }else{
               Trace("sep-process-debug") << "  no children." << std::endl;
               Assert( s_atom.getKind()==kind::SEP_PTO );
@@ -596,6 +604,11 @@ void TheorySep::check(Effort e) {
         }
       }
       if( !addedLemma ){
+        if( needAddLemma ){
+          Trace("sep-model") << "WARNING : could not find refinement lemma!!!" << std::endl;
+          Assert( false );
+          d_out->setIncomplete();
+        }
         for( std::map< TypeNode, Node >::iterator it = d_base_label.begin(); it != d_base_label.end(); ++it ){
           //, (label = " << it->second << ")
           Trace("sep-model") << "Model for heap, type = " << it->first << " : " << std::endl;

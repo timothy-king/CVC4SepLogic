@@ -45,7 +45,11 @@ TESTS =	\
   nemp.smt2 \
   wand-crash.smt2 \
   wand-nterm-simp.smt2 \
-  wand-nterm-simp2.smt2 
+  wand-nterm-simp2.smt2 \
+  loop-1220.smt2 \
+  chain-int.smt2 \
+  sep-neg-swap.smt2 \
+  sep-neg-nstrict2.smt2
 
 
 FAILING_TESTS =
