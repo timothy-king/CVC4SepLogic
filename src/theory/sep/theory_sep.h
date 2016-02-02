@@ -179,7 +179,7 @@ class TheorySep : public Theory {
   std::vector< int > d_pending_lem;
 
   /** list of all refinement lemms */
-  std::map< Node, bool > d_refinement_lem;
+  std::map< Node, std::map< Node, std::vector< Node > > > d_refinement_lem;
 
   /** Conflict when merging constants */
   void conflict(TNode a, TNode b);
@@ -190,8 +190,9 @@ class TheorySep : public Theory {
   std::map< Node, std::map< Node, Node > > d_neg_guard;
   std::vector< Node > d_neg_guards;
   //cache for references
-  std::map< Node, TypeNode > d_reference_type;
-  std::map< Node, std::vector< Node > > d_references;
+  std::map< Node, std::map< int, TypeNode > > d_reference_type;
+  std::map< Node, std::map< int, int > > d_reference_type_card;
+  std::map< Node, std::map< int, std::vector< Node > > > d_references;
   /** inferences: maintained to ensure ref count for internally introduced nodes */
   NodeList d_infer;
   NodeList d_infer_exp;
@@ -206,7 +207,9 @@ class TheorySep : public Theory {
   std::map< TypeNode, Node > d_reference_bound_max;
   std::map< TypeNode, std::vector< Node > > d_type_references;
   std::map< TypeNode, std::vector< Node > > d_type_references_all;
-  std::map< TypeNode, unsigned > d_emp_occ_max;
+  std::map< TypeNode, unsigned > d_card_max;
+  //bounds for labels
+  std::map< Node, std::vector< Node > > d_lbl_reference_bound;
   //for empty argument
   std::map< TypeNode, Node > d_emp_arg;
   //map from ( atom, label, child index ) -> label
@@ -224,8 +227,8 @@ class TheorySep : public Theory {
   HeapAssertInfo * getOrMakeEqcInfo( Node n, bool doMake = false );
 
   //calculate the element type of the heap for spatial assertions
-  TypeNode getReferenceType( Node atom );
-  TypeNode getReferenceType2( Node atom, Node n, std::map< Node, bool >& visited );
+  TypeNode getReferenceType( Node atom, int& card, int index = -1 );
+  TypeNode getReferenceType2( Node atom, int& card, int index, Node n, std::map< Node, int >& visited);
   //get the base label for the spatial assertion
   Node getBaseLabel( TypeNode tn );
   Node getLabel( Node atom, int child, Node lbl );
@@ -251,7 +254,7 @@ class TheorySep : public Theory {
   void mergePto( Node p1, Node p2 );
   void computeLabelModel( Node lbl, std::map< Node, Node >& tmodel );
   Node instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, std::map< Node, Node >& tmodel, 
-                         TypeNode rtn, std::vector< Node >& assump, std::map< Node, bool >& active_lbl, unsigned ind = 0 );
+                         TypeNode rtn, std::map< Node, bool >& active_lbl, unsigned ind = 0 );
   void setInactiveAssertionRec( Node fact, std::map< Node, std::vector< Node > >& lbl_to_assertions, std::map< Node, bool >& assert_active );
 
   //hack FIXME

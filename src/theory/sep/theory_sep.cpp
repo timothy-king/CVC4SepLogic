@@ -81,8 +81,9 @@ Node TheorySep::ppRewrite(TNode term) {
   Node s_atom = term.getKind()==kind::NOT ? term[0] : term;
   if( s_atom.getKind()==kind::SEP_PTO || s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND || s_atom.getKind()==kind::EMP_STAR ){
     //get the reference type (will compute d_type_references)
-    TypeNode tn = getReferenceType( s_atom );
-    Trace("sep-pp") << "  reference type is " << tn << std::endl;
+    int card = 0;
+    TypeNode tn = getReferenceType( s_atom, card );
+    Trace("sep-pp") << "  reference type is " << tn << ", card is " << card << std::endl;
   }
   return term;
 }
@@ -266,8 +267,9 @@ void TheorySep::check(Effort e) {
         Trace("sep-lemma-debug") << "Reducing unlabelled assertion " << atom << std::endl;
         d_reduce.insert( fact );
         //introduce top-level label, add iff
-        TypeNode refType = getReferenceType( s_atom );
-        Trace("sep-lemma-debug") << "...reference type is : " << refType << std::endl;
+        int card;
+        TypeNode refType = getReferenceType( s_atom, card );
+        Trace("sep-lemma-debug") << "...reference type is : " << refType << ", card is " << card << std::endl;
         Node b_lbl = getBaseLabel( refType );
         Node s_atom_new = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, s_atom, b_lbl );
         Node lem;
@@ -292,9 +294,15 @@ void TheorySep::check(Effort e) {
             if( s_atom.getKind()==kind::SEP_STAR || s_atom.getKind()==kind::SEP_WAND ){
               std::vector< Node > children;
               std::vector< Node > c_lems;
-              TypeNode tn = getReferenceType( s_atom );
+              int card;
+              TypeNode tn = getReferenceType( s_atom, card );
               Assert( d_reference_bound.find( tn )!=d_reference_bound.end() );
-              c_lems.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
+              if( options::sepPreciseBound() ){
+                //more precise bound
+
+              }else{
+                c_lems.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
+              }
               std::vector< Node > labels;
               getLabelChildren( s_atom, s_lbl, children, labels );
               Node empSet = NodeManager::currentNM()->mkConst(EmptySet(s_lbl.getType().toType()));
@@ -556,7 +564,8 @@ void TheorySep::check(Effort e) {
             //add refinement lemma
             if( d_label_map[s_atom].find( s_lbl )!=d_label_map[s_atom].end() ){
               needAddLemma = true;
-              TypeNode tn = getReferenceType( s_atom );
+              int card;
+              TypeNode tn = getReferenceType( s_atom, card );
               //SEP-POLY
               tn = NodeManager::currentNM()->mkSetType(tn);
               //tn = NodeManager::currentNM()->mkSetType(NodeManager::currentNM()->mkRefType(tn));
@@ -594,7 +603,7 @@ void TheorySep::check(Effort e) {
               }else{
                 //new refinement
                 std::map< Node, Node > visited;
-                Node inst = instantiateLabel( s_atom, s_lbl, s_lbl, o_b_lbl_mval, visited, pto_model, tmodel, tn, conc, active_lbl );
+                Node inst = instantiateLabel( s_atom, s_lbl, s_lbl, o_b_lbl_mval, visited, pto_model, tmodel, tn, active_lbl );
                 Trace("sep-inst-debug") << "    applied inst : " << inst << std::endl;
                 if( inst.isNull() ){
                   inst_success = false;
@@ -616,9 +625,9 @@ void TheorySep::check(Effort e) {
                 lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
                 lemc.insert( lemc.end(), conc.begin(), conc.end() );
                 Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
-                if( d_refinement_lem.find( lem )==d_refinement_lem.end() ){
-                  d_refinement_lem[lem] = true;
-                  Trace("sep-process") << "-----> refinement lemma : " << lem << std::endl;
+                if( std::find( d_refinement_lem[s_atom][s_lbl].begin(), d_refinement_lem[s_atom][s_lbl].end(),  lem )==d_refinement_lem[s_atom][s_lbl].end() ){
+                  d_refinement_lem[s_atom][s_lbl].push_back( lem );
+                  Trace("sep-process") << "-----> refinement lemma (#" << d_refinement_lem[s_atom][s_lbl].size() << ") : " << lem << std::endl;
                   Trace("sep-lemma") << "Sep::Lemma : negated star/wand refinement : " << lem << std::endl;
                   d_out->lemma( lem );
                   addedLemma = true;
@@ -712,45 +721,61 @@ TheorySep::HeapAssertInfo * TheorySep::getOrMakeEqcInfo( Node n, bool doMake ) {
   }
 }
 
-TypeNode TheorySep::getReferenceType( Node atom ) {
-  Assert( atom.getKind()==kind::SEP_PTO || atom.getKind()==kind::SEP_STAR || atom.getKind()==kind::SEP_WAND || atom.getKind()==kind::EMP_STAR );
-  std::map< Node, TypeNode >::iterator it = d_reference_type.find( atom );
-  if( it==d_reference_type.end() ){
-    //will compute d_references as well
-    std::map< Node, bool > visited;
-    TypeNode tn = getReferenceType2( atom, atom, visited );
-    if( tn.isNull() ){
+TypeNode TheorySep::getReferenceType( Node atom, int& card, int index ) {
+  Trace("sep-type") << "getReference type " << atom << " " << index << std::endl;
+  Assert( atom.getKind()==kind::SEP_PTO || atom.getKind()==kind::SEP_STAR || atom.getKind()==kind::SEP_WAND || atom.getKind()==kind::EMP_STAR || index!=-1 );
+  std::map< int, TypeNode >::iterator it = d_reference_type[atom].find( index );
+  if( it==d_reference_type[atom].end() ){
+    card = 0;
+    TypeNode tn;      
+    if( index==-1 && ( atom.getKind()==kind::SEP_STAR || atom.getKind()==kind::SEP_WAND ) ){
+      for( unsigned i=0; i<atom.getNumChildren(); i++ ){
+        int cardc = 0;
+        TypeNode ctn = getReferenceType( atom, cardc, i );
+        if( !ctn.isNull() ){
+          tn = ctn;
+        }
+        card = card + cardc;
+      }
+    }else{
+      Node n = index==-1 ? atom : atom[index];
+      //will compute d_references as well
+      std::map< Node, int > visited;
+      tn = getReferenceType2( atom, card, index, n, visited );
+    }
+    if( tn.isNull() && index==-1 ){
       tn = NodeManager::currentNM()->booleanType();
     }
-    d_reference_type[atom] = tn;
+    d_reference_type[atom][index] = tn;
+    d_reference_type_card[atom][index] = card;
     //add to d_type_references
-    unsigned emp_occ = 0;
-    for( unsigned i=0; i<d_references[atom].size(); i++ ){
-      if( !d_references[atom][i].isNull() ){
-        if( std::find( d_type_references[tn].begin(), d_type_references[tn].end(), d_references[atom][i] )==d_type_references[tn].end() ){
-          d_type_references[tn].push_back( d_references[atom][i] );
+    if( index==-1 ){
+      //only contributes if top-level (index=-1)
+      for( unsigned i=0; i<d_references[atom][index].size(); i++ ){
+        Assert( !d_references[atom][index][i].isNull() );
+        if( std::find( d_type_references[tn].begin(), d_type_references[tn].end(), d_references[atom][index][i] )==d_type_references[tn].end() ){
+          d_type_references[tn].push_back( d_references[atom][index][i] );
         }
-      }else{
-        //new variable for each emp occurrence
-        emp_occ++;
+      }
+      // update maximum cardinality value
+      if( card>(int)d_card_max[tn] ){
+        d_card_max[tn] = card;
       }
     }
-    if( emp_occ>d_emp_occ_max[tn] ){
-      d_emp_occ_max[tn] = emp_occ;
-    }
-
     return tn;
   }else{
+    Assert( d_reference_type_card[atom].find( index )!=d_reference_type_card[atom].end() );
+    card = d_reference_type_card[atom][index];
     return it->second;
   }
 }
 
-TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >& visited ) {
+TypeNode TheorySep::getReferenceType2( Node atom, int& card, int index, Node n, std::map< Node, int >& visited ) {
   if( visited.find( n )==visited.end() ){
-    visited[n] = true;
+    visited[n] = -1;
     if( n.getKind()==kind::SEP_PTO ){
-      if( std::find( d_references[atom].begin(), d_references[atom].end(), n[0] )==d_references[atom].end() ){
-        d_references[atom].push_back( n[0] );
+      if( std::find( d_references[atom][index].begin(), d_references[atom][index].end(), n[0] )==d_references[atom][index].end() ){
+        d_references[atom][index].push_back( n[0] );
       }
       //SEP-POLY
       TypeNode tn1 = n[0].getType();
@@ -765,33 +790,62 @@ TypeNode TheorySep::getReferenceType2( Node atom, Node n, std::map< Node, bool >
           Assert( false );
         }
       }
+      card = 1;
+      visited[n] = card;
       return tn1;
       //return n[1].getType();
     }else if( n.getKind()==kind::EMP_STAR ){
-      d_references[atom].push_back( Node::null() );
+      card = 1;
+      visited[n] = card;
       return n[0].getType();
-    }else if( n!=atom && ( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ) ){
-      TypeNode tn = getReferenceType( n );
-      for( unsigned j=0; j<d_references[n].size(); j++ ){
-        if( std::find( d_references[atom].begin(), d_references[atom].end(), d_references[n][j] )==d_references[atom].end() ){
-          d_references[atom].push_back( d_references[n][j] );
+    }else if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ){
+      Assert( n!=atom );
+      //get the references 
+      card = 0;
+      TypeNode tn = getReferenceType( n, card );
+      for( unsigned j=0; j<d_references[n][-1].size(); j++ ){
+        if( std::find( d_references[atom][index].begin(), d_references[atom][index].end(), d_references[n][-1][j] )==d_references[atom][index].end() ){
+          d_references[atom][index].push_back( d_references[n][-1][j] );
         }
       }
+      visited[n] = card;
       return tn;
     }else{
+      card = 0;
       TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
-        TypeNode tn = getReferenceType2( atom, n[i], visited );
+        int cardc = 0;
+        TypeNode tn = getReferenceType2( atom, index, cardc, n[i], visited );
         if( !tn.isNull() ){
           otn = tn;
-          //return tn;
         }
+        card = cardc>card ? cardc : card;
       }
+      visited[n] = card;
       return otn;
     }
+  }else{
+    card = 0;
+    return TypeNode::null();
   }
-  return TypeNode::null();
 }
+/*
+
+int TheorySep::getCardinality( Node n, std::vector< Node >& refs ) {
+  std::map< Node, int > visited;
+  return getCardinality2( n, refs, visited );
+}
+
+int TheorySep::getCardinality2( Node n, std::vector< Node >& refs, std::map< Node, int >& visited ) {
+  std::map< Node, int >::iterator it = visited.find( n );
+  if( it!=visited.end() ){
+    return it->second;
+  }else{
+    
+    
+  }
+}
+*/
 
 Node TheorySep::getBaseLabel( TypeNode tn ) {
   std::map< TypeNode, Node >::iterator it = d_base_label.find( tn );
@@ -811,11 +865,18 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     d_reference_bound[tn] = NodeManager::currentNM()->mkSkolem( ss2.str(), ltn, "" );
     d_type_references_all[tn].insert( d_type_references_all[tn].end(), d_type_references[tn].begin(), d_type_references[tn].end() );
     //add a reference type for maximum occurrences of empty in a constraint
-    unsigned n_emp = d_emp_occ_max[tn]>d_emp_occ_max[TypeNode::null()] ? d_emp_occ_max[tn] : d_emp_occ_max[TypeNode::null()];
+    unsigned n_emp = d_card_max[tn]>d_card_max[TypeNode::null()] ? d_card_max[tn] : d_card_max[TypeNode::null()];
     for( unsigned r=0; r<n_emp; r++ ){
       //SEP-POLY
-      d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", tn ) );
+      Node e = NodeManager::currentNM()->mkSkolem( "e", tn );
       //d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
+      //ensure that it is distinct from all other references so far
+      for( unsigned j=0; j<d_type_references_all[tn].size(); j++ ){
+        Node eq = NodeManager::currentNM()->mkNode( e.getType().isBoolean() ? kind::IFF : kind::EQUAL, e, d_type_references_all[tn][j] );
+        d_out->lemma( eq.negate() );
+      }
+      d_type_references_all[tn].push_back( e );
+      d_lbl_reference_bound[d_base_label[tn]].push_back( e );
     }
     //construct bound
     if( d_type_references_all[tn].empty() ){
@@ -847,7 +908,8 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
 Node TheorySep::getLabel( Node atom, int child, Node lbl ) {
   std::map< int, Node >::iterator it = d_label_map[atom][lbl].find( child );
   if( it==d_label_map[atom][lbl].end() ){
-    TypeNode refType = getReferenceType( atom );
+    int card;
+    TypeNode refType = getReferenceType( atom, card );
     std::stringstream ss;
     ss << "__Lc" << child;
     //SEP-POLY
@@ -894,7 +956,7 @@ Node TheorySep::applyLabel( Node n, Node lbl, std::map< Node, Node >& visited ) 
 }
 
 Node TheorySep::instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, std::map< Node, Node >& tmodel,
-                                  TypeNode rtn, std::vector< Node >& assump, std::map< Node, bool >& active_lbl, unsigned ind ) {
+                                  TypeNode rtn, std::map< Node, bool >& active_lbl, unsigned ind ) {
   Trace("sep-inst-debug") << "Instantiate label " << n << " " << lbl << " " << lbl_v << std::endl;
   if( options::sepMinimalRefine() && lbl!=o_lbl && active_lbl.find( lbl )!=active_lbl.end() ){
     Trace("sep-inst") << "...do not instantiate " << o_lbl << " since it has an active sublabel " << lbl << std::endl;
@@ -919,7 +981,7 @@ Node TheorySep::instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std:
         computeLabelModel( sub_lbl, tmodel );
         Assert( d_label_model.find( sub_lbl )!=d_label_model.end() );
         Node lbl_mval = d_label_model[sub_lbl].getValue( rtn );
-        children[sub_index] = instantiateLabel( n[sub_index], o_lbl, sub_lbl, lbl_mval, visited, pto_model, tmodel, rtn, assump, active_lbl, ind+1 );
+        children[sub_index] = instantiateLabel( n[sub_index], o_lbl, sub_lbl, lbl_mval, visited, pto_model, tmodel, rtn, active_lbl, ind+1 );
         if( children[sub_index].isNull() ){
           return Node::null();
         }
@@ -1019,7 +1081,7 @@ Node TheorySep::instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std:
         }
         bool childChanged = false;
         for( unsigned i=0; i<n.getNumChildren(); i++ ){
-          Node aln = instantiateLabel( n[i], o_lbl, lbl, lbl_v, visited, pto_model, tmodel, rtn, assump, active_lbl, ind );
+          Node aln = instantiateLabel( n[i], o_lbl, lbl, lbl_v, visited, pto_model, tmodel, rtn, active_lbl, ind );
           if( aln.isNull() ){
             return Node::null();
           }else{
