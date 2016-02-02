@@ -178,6 +178,9 @@ class TheorySep : public Theory {
   std::vector< Node > d_pending;
   std::vector< int > d_pending_lem;
 
+  /** list of all refinement lemms */
+  std::map< Node, bool > d_refinement_lem;
+
   /** Conflict when merging constants */
   void conflict(TNode a, TNode b);
 
@@ -248,7 +251,7 @@ class TheorySep : public Theory {
   void mergePto( Node p1, Node p2 );
   void computeLabelModel( Node lbl, std::map< Node, Node >& tmodel );
   Node instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std::map< Node, Node >& visited, std::map< Node, Node >& pto_model, std::map< Node, Node >& tmodel, 
-                         TypeNode rtn, std::vector< Node >& assump, unsigned ind = 0 );
+                         TypeNode rtn, std::vector< Node >& assump, std::map< Node, bool >& active_lbl, unsigned ind = 0 );
   void setInactiveAssertionRec( Node fact, std::map< Node, std::vector< Node > >& lbl_to_assertions, std::map< Node, bool >& assert_active );
 
   //hack FIXME
