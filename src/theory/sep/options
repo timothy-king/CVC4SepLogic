@@ -14,5 +14,8 @@ option sepMinimalRefine --sep-min-refine bool :default false
  only add refinement lemmas for minimal (innermost) assertions
 option sepPreciseBound --sep-prec-bound bool :default false
  calculate precise bounds for labels
+option sepDisequalC --sep-deq-c bool :default true
+ assume cardinality elements are distinct
+
 
 endmodule

@@ -297,11 +297,40 @@ void TheorySep::check(Effort e) {
               int card;
               TypeNode tn = getReferenceType( s_atom, card );
               Assert( d_reference_bound.find( tn )!=d_reference_bound.end() );
+              c_lems.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
               if( options::sepPreciseBound() ){
                 //more precise bound
-
-              }else{
-                c_lems.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, s_lbl, d_reference_bound[tn] ) );
+                Trace("sep-bound") << "Propagate Bound(" << s_lbl << ") = ";
+                Assert( d_lbl_reference_bound.find( s_lbl )!=d_lbl_reference_bound.end() );
+                for( unsigned j=0; j<d_lbl_reference_bound[s_lbl].size(); j++ ){
+                  Trace("sep-bound") << d_lbl_reference_bound[s_lbl][j] << " ";
+                }
+                Trace("sep-bound") << std::endl << "  to children of " << s_atom << std::endl;
+                //int rb_start = 0;
+                for( unsigned j=0; j<s_atom.getNumChildren(); j++ ){
+                  int ccard = 0;
+                  getReferenceType( s_atom, ccard, j );
+                  Node c_lbl = getLabel( s_atom, j, s_lbl );
+                  Trace("sep-bound") << "  for " << c_lbl << ", card = " << ccard << " : ";
+                  std::vector< Node > bound_loc;
+                  bound_loc.insert( bound_loc.end(), d_references[s_atom][j].begin(), d_references[s_atom][j].end() );
+/*                //this is unsound
+                  for( int k=0; k<ccard; k++ ){
+                    Assert( rb_start<(int)d_lbl_reference_bound[s_lbl].size() );
+                    d_lbl_reference_bound[c_lbl].push_back( d_lbl_reference_bound[s_lbl][rb_start] );
+                    Trace("sep-bound") << d_lbl_reference_bound[s_lbl][rb_start] << " ";
+                    bound_loc.push_back( d_lbl_reference_bound[s_lbl][rb_start] );
+                    rb_start++;
+                  }
+*/
+                  //carry all locations for now
+                  bound_loc.insert( bound_loc.end(), d_lbl_reference_bound[s_lbl].begin(), d_lbl_reference_bound[s_lbl].end() );
+                  Trace("sep-bound") << std::endl;
+                  Node bound_v = mkUnion( tn, bound_loc );
+                  Trace("sep-bound") << "  ...bound value : " << bound_v << std::endl;
+                  children.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, c_lbl, bound_v ) );
+                }     
+                Trace("sep-bound") << "Done propagate Bound(" << s_lbl << ")" << std::endl;        
               }
               std::vector< Node > labels;
               getLabelChildren( s_atom, s_lbl, children, labels );
@@ -735,6 +764,11 @@ TypeNode TheorySep::getReferenceType( Node atom, int& card, int index ) {
         if( !ctn.isNull() ){
           tn = ctn;
         }
+        for( unsigned j=0; j<d_references[atom][i].size(); j++ ){
+          if( std::find( d_references[atom][index].begin(), d_references[atom][index].end(), d_references[atom][i][j] )==d_references[atom][index].end() ){
+            d_references[atom][index].push_back( d_references[atom][i][j] );
+          }
+        }
         card = card + cardc;
       }
     }else{
@@ -748,6 +782,7 @@ TypeNode TheorySep::getReferenceType( Node atom, int& card, int index ) {
     }
     d_reference_type[atom][index] = tn;
     d_reference_type_card[atom][index] = card;
+    Trace("sep-type") << "...ref type return " << card << " for " << atom << " " << index << std::endl;
     //add to d_type_references
     if( index==-1 ){
       //only contributes if top-level (index=-1)
@@ -772,6 +807,7 @@ TypeNode TheorySep::getReferenceType( Node atom, int& card, int index ) {
 
 TypeNode TheorySep::getReferenceType2( Node atom, int& card, int index, Node n, std::map< Node, int >& visited ) {
   if( visited.find( n )==visited.end() ){
+    Trace("sep-type-debug") << "visit : " << n << " : " << atom << " " << index << std::endl;
     visited[n] = -1;
     if( n.getKind()==kind::SEP_PTO ){
       if( std::find( d_references[atom][index].begin(), d_references[atom][index].end(), n[0] )==d_references[atom][index].end() ){
@@ -815,7 +851,7 @@ TypeNode TheorySep::getReferenceType2( Node atom, int& card, int index, Node n, 
       TypeNode otn;
       for( unsigned i=0; i<n.getNumChildren(); i++ ){
         int cardc = 0;
-        TypeNode tn = getReferenceType2( atom, index, cardc, n[i], visited );
+        TypeNode tn = getReferenceType2( atom, cardc, index, n[i], visited );
         if( !tn.isNull() ){
           otn = tn;
         }
@@ -825,6 +861,7 @@ TypeNode TheorySep::getReferenceType2( Node atom, int& card, int index, Node n, 
       return otn;
     }
   }else{
+    Trace("sep-type-debug") << "already visit : " << n << " : " << atom << " " << index << std::endl;
     card = 0;
     return TypeNode::null();
   }
@@ -868,31 +905,22 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     unsigned n_emp = d_card_max[tn]>d_card_max[TypeNode::null()] ? d_card_max[tn] : d_card_max[TypeNode::null()];
     for( unsigned r=0; r<n_emp; r++ ){
       //SEP-POLY
-      Node e = NodeManager::currentNM()->mkSkolem( "e", tn );
+      Node e = NodeManager::currentNM()->mkSkolem( "e", tn, "cardinality bound element for seplog" );
       //d_type_references_all[tn].push_back( NodeManager::currentNM()->mkSkolem( "e", NodeManager::currentNM()->mkRefType(tn) ) );
-      //ensure that it is distinct from all other references so far
-      for( unsigned j=0; j<d_type_references_all[tn].size(); j++ ){
-        Node eq = NodeManager::currentNM()->mkNode( e.getType().isBoolean() ? kind::IFF : kind::EQUAL, e, d_type_references_all[tn][j] );
-        d_out->lemma( eq.negate() );
+      if( options::sepDisequalC() ){
+        //ensure that it is distinct from all other references so far
+        for( unsigned j=0; j<d_type_references_all[tn].size(); j++ ){
+          Node eq = NodeManager::currentNM()->mkNode( e.getType().isBoolean() ? kind::IFF : kind::EQUAL, e, d_type_references_all[tn][j] );
+          d_out->lemma( eq.negate() );
+        }
       }
       d_type_references_all[tn].push_back( e );
       d_lbl_reference_bound[d_base_label[tn]].push_back( e );
     }
     //construct bound
-    if( d_type_references_all[tn].empty() ){
-      d_reference_bound_max[tn] = NodeManager::currentNM()->mkConst(EmptySet(ltn.toType()));
-    }else{
-      for( unsigned i=0; i<d_type_references_all[tn].size(); i++ ){
-        Node s = d_type_references_all[tn][i];
-        Assert( !s.isNull() );
-        s = NodeManager::currentNM()->mkNode( kind::SINGLETON, s );
-        if( d_reference_bound_max[tn].isNull() ){
-          d_reference_bound_max[tn] = s;
-        }else{
-          d_reference_bound_max[tn] = NodeManager::currentNM()->mkNode( kind::UNION, s, d_reference_bound_max[tn] );
-        }
-      }
-    }
+    d_reference_bound_max[tn] = mkUnion( tn, d_type_references_all[tn] );
+    Trace("sep-bound") << "overall bound for " << d_base_label[tn] << " : " << d_reference_bound_max[tn] << std::endl;
+
     Node slem = NodeManager::currentNM()->mkNode( kind::SUBSET, d_reference_bound[tn], d_reference_bound_max[tn] );
     Trace("sep-lemma") << "Sep::Lemma: reference bound for " << tn << " : " << slem << std::endl;
     d_out->lemma( slem );
@@ -902,6 +930,26 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     return n_lbl;
   }else{
     return it->second;
+  }
+}
+
+Node TheorySep::mkUnion( TypeNode tn, std::vector< Node >& locs ) {
+  Node u;
+  if( locs.empty() ){
+    TypeNode ltn = NodeManager::currentNM()->mkSetType(tn);
+    return NodeManager::currentNM()->mkConst(EmptySet(ltn.toType()));
+  }else{
+    for( unsigned i=0; i<locs.size(); i++ ){
+      Node s = locs[i];
+      Assert( !s.isNull() );
+      s = NodeManager::currentNM()->mkNode( kind::SINGLETON, s );
+      if( u.isNull() ){
+        u = s;
+      }else{
+        u = NodeManager::currentNM()->mkNode( kind::UNION, s, u );
+      }
+    }
+    return u;
   }
 }
 

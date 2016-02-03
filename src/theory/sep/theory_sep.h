@@ -259,6 +259,8 @@ class TheorySep : public Theory {
 
   //hack FIXME
   TheoryModel* d_last_model;
+
+  Node mkUnion( TypeNode tn, std::vector< Node >& locs );
 private:
   Node getRepresentative( Node t );
   bool hasTerm( Node a );
