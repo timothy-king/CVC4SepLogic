@@ -484,7 +484,7 @@ void TheorySep::check(Effort e) {
         if( s_atom.getKind()==kind::SEP_PTO ){
           Node vv = d_last_model->getRepresentative( s_atom[0] );
           if( pto_model.find( vv )==pto_model.end() ){
-            Trace("sep-inst") << "Pto : " << s_atom[0] << " -> " << s_atom[1] << std::endl;
+            Trace("sep-inst") << "Pto : " << s_atom[0] << " (" << vv << ") -> " << s_atom[1] << std::endl;
             pto_model[vv] = s_atom[1];
           }
         }
@@ -651,7 +651,8 @@ void TheorySep::check(Effort e) {
                   pol_atom = atom.negate();
                 }
                 lemc.push_back( pol_atom );
-                lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
+                //lemc.push_back( s_lbl.eqNode( o_b_lbl_mval ).negate() );
+                //lemc.push_back( NodeManager::currentNM()->mkNode( kind::SUBSET, o_b_lbl_mval, s_lbl ).negate() );
                 lemc.insert( lemc.end(), conc.begin(), conc.end() );
                 Node lem = NodeManager::currentNM()->mkNode( kind::OR, lemc );
                 if( std::find( d_refinement_lem[s_atom][s_lbl].begin(), d_refinement_lem[s_atom][s_lbl].end(),  lem )==d_refinement_lem[s_atom][s_lbl].end() ){
@@ -1018,108 +1019,74 @@ Node TheorySep::instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std:
     }
     Assert( n.getKind()!=kind::SEP_LABEL );
     if( n.getKind()==kind::SEP_STAR || n.getKind()==kind::SEP_WAND ){
-      std::vector< Node > children;
-      children.resize( n.getNumChildren() );
-      Assert( d_label_map[n].find( lbl )!=d_label_map[n].end() );
-      for( std::map< int, Node >::iterator itl = d_label_map[n][lbl].begin(); itl != d_label_map[n][lbl].end(); ++itl ){
-        Node sub_lbl = itl->second;
-        int sub_index = itl->first;
-        Assert( sub_index>=0 && sub_index<(int)children.size() );
-        Trace("sep-inst-debug") << "Sublabel " << sub_index << " is " << sub_lbl << std::endl;
-        computeLabelModel( sub_lbl, tmodel );
-        Assert( d_label_model.find( sub_lbl )!=d_label_model.end() );
-        Node lbl_mval = d_label_model[sub_lbl].getValue( rtn );
-        children[sub_index] = instantiateLabel( n[sub_index], o_lbl, sub_lbl, lbl_mval, visited, pto_model, tmodel, rtn, active_lbl, ind+1 );
-        if( children[sub_index].isNull() ){
-          return Node::null();
+      if( lbl==o_lbl ){
+        std::vector< Node > children;
+        children.resize( n.getNumChildren() );
+        Assert( d_label_map[n].find( lbl )!=d_label_map[n].end() );
+        for( std::map< int, Node >::iterator itl = d_label_map[n][lbl].begin(); itl != d_label_map[n][lbl].end(); ++itl ){
+          Node sub_lbl = itl->second;
+          int sub_index = itl->first;
+          Assert( sub_index>=0 && sub_index<(int)children.size() );
+          Trace("sep-inst-debug") << "Sublabel " << sub_index << " is " << sub_lbl << std::endl;
+          Node lbl_mval;
+          if( n.getKind()==kind::SEP_WAND && sub_index==1 ){
+            Assert( d_label_map[n][lbl].find( 0 )!=d_label_map[n][lbl].end() );
+            Node sub_lbl_0 = d_label_map[n][lbl][0];
+            computeLabelModel( sub_lbl_0, tmodel );
+            Assert( d_label_model.find( sub_lbl_0 )!=d_label_model.end() );
+            lbl_mval = NodeManager::currentNM()->mkNode( kind::UNION, lbl, d_label_model[sub_lbl_0].getValue( rtn ) );
+          }else{
+            computeLabelModel( sub_lbl, tmodel );
+            Assert( d_label_model.find( sub_lbl )!=d_label_model.end() );
+            lbl_mval = d_label_model[sub_lbl].getValue( rtn );
+          }
+          Trace("sep-inst-debug") << "Sublabel value is " << lbl_mval  << std::endl;
+          children[sub_index] = instantiateLabel( n[sub_index], o_lbl, sub_lbl, lbl_mval, visited, pto_model, tmodel, rtn, active_lbl, ind+1 );
+          if( children[sub_index].isNull() ){
+            return Node::null();
+          }
         }
-      }
-      if( n.getKind()==kind::SEP_STAR ){
-        Assert( children.size()>1 );
-        return NodeManager::currentNM()->mkNode( kind::AND, children );      
+        if( n.getKind()==kind::SEP_STAR ){
+          Assert( children.size()>1 );
+          return NodeManager::currentNM()->mkNode( kind::AND, children );      
+        }else{
+          return NodeManager::currentNM()->mkNode( kind::OR, children[0].negate(), children[1] );
+        }
       }else{
-        return NodeManager::currentNM()->mkNode( kind::OR, children[0].negate(), children[1] );
+        //nested star/wand, label it and return
+        return NodeManager::currentNM()->mkNode( kind::SEP_LABEL, n, lbl_v );
       }
     }else if( n.getKind()==kind::SEP_PTO ){
       //check if this pto reference is in the base label, if not, then it does not need to be added as an assumption
       Assert( d_label_model.find( o_lbl )!=d_label_model.end() );
       Node vr = d_last_model->getRepresentative( n[0] );
       Node svr = NodeManager::currentNM()->mkNode( kind::SINGLETON, vr );
-      bool addAssump = std::find( d_label_model[o_lbl].d_heap_locs_model.begin(), d_label_model[o_lbl].d_heap_locs_model.end(), svr )!=d_label_model[o_lbl].d_heap_locs_model.end();
-      Trace("sep-inst-debug") << "Is assumption required : " << addAssump << " for value ref " << vr << " in " << o_lbl << std::endl;
-      if( Trace.isOn("sep-inst") ){
-        for( unsigned j=0; j<(ind+1); j++ ){ Trace("sep-inst") << "  "; }
-      }
-      if( lbl_v.getKind()==kind::SINGLETON ){
-#if 0
-        Node vv = d_last_model->getRepresentative( lbl_v[0] );
-        if( vv!=vr ){
-          Trace("sep-inst") << "pto disequal reference." << std::endl;
-          if( addAssump ){      
-            //add to assumption
-            Node a = n[0].eqNode( lbl_v[0] );
-            Trace("sep-inst") << "=> Assumption : " << a.negate() << std::endl;
-            assump.push_back( a );
-          }
-          return NodeManager::currentNM()->mkConst( false );
-        }else{
-          std::map< Node, Node >::iterator it = pto_model.find( vv );
-          if( it!=pto_model.end() ){
-            Trace("sep-inst") << "pto " << lbl_v[0] << " (val=" << vv << ") = " << it->second << std::endl;
-            if( addAssump ){          
-              //add to assumption
-              Node a = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], it->second ), NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ) );
-              Trace("sep-inst") << "=> Assumption : " << a << std::endl;
-              assump.push_back( a.negate() );
-            }
-            std::vector< Node > children;
-            if( n[0]!=lbl_v[0] ){
-              children.push_back( NodeManager::currentNM()->mkNode( kind::EQUAL, n[0], lbl_v[0] ) );
-            }
-            if( n[1]!=it->second ){
-              children.push_back( NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second ) );
-            }
-            return children.empty() ? NodeManager::currentNM()->mkConst( true ) : ( children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children ) );
-          }else{
-            Trace("sep-inst") << "pto " << lbl_v[0] << " = null." << std::endl;
-            if( addAssump ){
-              //add to assumption
-              Node a = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], n[1] ), NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ) );
-              //Node a = NodeManager::currentNM()->mkNode( kind::MEMBER, n[0], o_lbl );
-              Trace("sep-inst") << "=> Assumption : " << a.negate() << std::endl;
-              assump.push_back( a );
-            }
-            return NodeManager::currentNM()->mkConst( false );
-          }
-        }
-#else
-        std::vector< Node > children;
-        if( addAssump ){
-          Node s = NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] );
-          Node c1 = NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], n[1] ), s );
-          children.push_back( c1 );
-        }else{
-          Node vv = d_last_model->getRepresentative( lbl_v[0] );
-          std::map< Node, Node >::iterator it = pto_model.find( vv );
-          if( it!=pto_model.end() ){
-            if( n[1]!=it->second ){
-              children.push_back( NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second ) );
-            }
-          }else{
-            return NodeManager::currentNM()->mkConst( false );
-          }
-        } 
-        if( n[0]!=lbl_v[0] ){
-          children.push_back( NodeManager::currentNM()->mkNode( n[0].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[0], lbl_v[0] ) );
-        }
-        return children.empty() ? NodeManager::currentNM()->mkConst( true ) : ( children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children ) );
-#endif
+      bool inBaseHeap = std::find( d_label_model[o_lbl].d_heap_locs_model.begin(), d_label_model[o_lbl].d_heap_locs_model.end(), svr )!=d_label_model[o_lbl].d_heap_locs_model.end();
+      Trace("sep-inst-debug") << "Is in base (non-instantiating) heap : " << inBaseHeap << " for value ref " << vr << " in " << o_lbl << std::endl;
+      std::vector< Node > children;
+      if( inBaseHeap ){
+        Node s = NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] );
+        children.push_back( NodeManager::currentNM()->mkNode( kind::SEP_LABEL, NodeManager::currentNM()->mkNode( kind::SEP_PTO, n[0], n[1] ), s ) );
       }else{
-        Trace("sep-inst") << "pto bad cardinality : " << lbl_v << std::endl;
-        return NodeManager::currentNM()->mkConst( false );
-      }
+        //look up value of data
+        std::map< Node, Node >::iterator it = pto_model.find( vr );
+        if( it!=pto_model.end() ){
+          if( n[1]!=it->second ){
+            children.push_back( NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second ) );
+          }
+        }else{
+          //value of data not explicitly stated, assume disequal
+          Trace("sep-inst-debug") << "Return false, data for " << vr << " was not specified." << std::endl;
+          return NodeManager::currentNM()->mkConst( false );
+        }
+      } 
+      children.push_back( NodeManager::currentNM()->mkNode( kind::EQUAL, NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ), lbl_v ) );
+      Node ret = children.empty() ? NodeManager::currentNM()->mkConst( true ) : ( children.size()==1 ? children[0] : NodeManager::currentNM()->mkNode( kind::AND, children ) );
+      Trace("sep-inst-debug") << "Return " << ret << std::endl;
+      return ret;
     }else if( n.getKind()==kind::EMP_STAR ){
-      return NodeManager::currentNM()->mkConst( lbl_v.getKind()==kind::EMPTYSET );
+      //return NodeManager::currentNM()->mkConst( lbl_v.getKind()==kind::EMPTYSET );
+      return lbl_v.eqNode( NodeManager::currentNM()->mkConst(EmptySet(lbl_v.getType().toType())) );
     }else{
       std::map< Node, Node >::iterator it = visited.find( n );
       if( it==visited.end() ){
