@@ -424,15 +424,16 @@ void TheorySep::check(Effort e) {
         }
         Trace("sep-assert") << "Done asserting " << atom << " to EE." << std::endl;
       }else if( s_atom.getKind()==kind::SEP_PTO ){
-        if( polarity ){
+        Node pto_lbl = NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] );
+        if( polarity && s_lbl!=pto_lbl ){
           //also propagate equality
-          Node eq = s_lbl.eqNode( NodeManager::currentNM()->mkNode( kind::SINGLETON, s_atom[0] ) );
+          Node eq = s_lbl.eqNode( pto_lbl );
           Trace("sep-assert") << "Asserting implied equality " << eq << " to EE..." << std::endl;
           d_equalityEngine.assertEquality(eq, true, fact);
           Trace("sep-assert") << "Done asserting implied equality " << eq << " to EE." << std::endl;
         }
         //associate the equivalence class of the lhs with this pto
-        Node r = getRepresentative( s_atom[0] );
+        Node r = getRepresentative( s_lbl );
         HeapAssertInfo * ei = getOrMakeEqcInfo( r, true );
         addPto( ei, r, atom, polarity );
       }
@@ -681,6 +682,7 @@ void TheorySep::check(Effort e) {
           d_out->setIncomplete();
         }
         for( std::map< TypeNode, Node >::iterator it = d_base_label.begin(); it != d_base_label.end(); ++it ){
+          computeLabelModel( it->second, tmodel );
           //, (label = " << it->second << ")
           Trace("sep-model") << "Model for heap, type = " << it->first << " : " << std::endl;
           if( d_label_model[it->second].d_heap_locs_model.empty() ){
@@ -1260,7 +1262,7 @@ void TheorySep::validatePto( HeapAssertInfo * ei, Node ei_n ) {
         Assert( atom.getKind()==kind::SEP_LABEL );
         TNode s_atom = atom[0];
         if( s_atom.getKind()==kind::SEP_PTO ){
-          if( areEqual( s_atom[0], ei_n ) ){
+          if( areEqual( atom[1], ei_n ) ){
             addPto( ei, ei_n, atom, false );
           }
         }
@@ -1315,9 +1317,9 @@ void TheorySep::mergePto( Node p1, Node p2 ) {
   Assert( p2.getKind()==kind::SEP_LABEL && p2[0].getKind()==kind::SEP_PTO );
   if( !areEqual( p1[0][1], p2[0][1] ) ){
     std::vector< Node > exp;
-    if( p1[0][0]!=p2[0][0] ){
-      Assert( areEqual( p1[0][0], p2[0][0] ) );
-      exp.push_back( p1[0][0].eqNode( p2[0][0] ) );
+    if( p1[1]!=p2[1] ){
+      Assert( areEqual( p1[1], p2[1] ) );
+      exp.push_back( p1[1].eqNode( p2[1] ) );
     }
     exp.push_back( p1 );
     exp.push_back( p2 );

@@ -49,7 +49,8 @@ TESTS =	\
   loop-1220.smt2 \
   chain-int.smt2 \
   sep-neg-swap.smt2 \
-  sep-neg-nstrict2.smt2
+  sep-neg-nstrict2.smt2 \
+  dispose-list-4-init.smt2
 
 
 FAILING_TESTS =
