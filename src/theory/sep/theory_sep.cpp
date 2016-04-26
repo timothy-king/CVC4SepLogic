@@ -1288,10 +1288,10 @@ void TheorySep::addPto( HeapAssertInfo * ei, Node ei_n, Node p, bool polarity ) 
       Trace("sep-pto") << "Process positive/negated pto " << " " << pb << " " << p << std::endl;
       Assert( pb.getKind()==kind::SEP_LABEL && pb[0].getKind()==kind::SEP_PTO );
       Assert( p.getKind()==kind::SEP_LABEL && p[0].getKind()==kind::SEP_PTO );
-      Assert( areEqual( pb[0][0], p[0][0] ) );
+      Assert( areEqual( pb[1], p[1] ) );
       std::vector< Node > exp;
-      if( pb[0][0]!=p[0][0] ){
-        exp.push_back( pb[0][0].eqNode( p[0][0] ) );
+      if( pb[1]!=p[1] ){
+        exp.push_back( pb[1].eqNode( p[1] ) );
       }
       exp.push_back( pb );
       exp.push_back( p.negate() );
