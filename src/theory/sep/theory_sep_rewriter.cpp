@@ -104,6 +104,14 @@ RewriteResponse TheorySepRewriter::postRewrite(TNode node) {
   Trace("sep-postrewrite") << "Sep::postRewrite start " << node << std::endl;
   Node retNode = node;
   switch (node.getKind()) {
+    case kind::SEP_NIL: {
+      TypeEnumerator te(node[0].getType());
+      Node n = *te;
+      if( n!=node[0] ){
+        retNode = NodeManager::currentNM()->mkNode( kind::SEP_NIL, n );
+      }
+      break;
+    }
     case kind::SEP_LABEL: {
       if( node[0].getKind()==kind::SEP_PTO ){
         Node s = NodeManager::currentNM()->mkNode( kind::SINGLETON, node[0][0] );

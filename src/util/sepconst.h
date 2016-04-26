@@ -33,18 +33,14 @@ namespace CVC4 {
 namespace CVC4 {
 
 class CVC4_PUBLIC NilRef {
-  const RefType d_type;
+  const Type d_type;
   NilRef() { }
 public:
-  /**
-   * Constructs an nil ref of the specified type. Note that the argument
-   * is the type of the ref itself, NOT the type of the constituent type.
-   */
-  NilRef(RefType refType):d_type(refType) { }
+  NilRef(Type refType):d_type(refType) { }
 
   ~NilRef() throw() {
   }
-  RefType getType() const { return d_type; }
+  Type getType() const { return d_type; }
   bool operator==(const NilRef& es) const throw() {
     return d_type == es.d_type;
   }

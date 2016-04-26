@@ -162,10 +162,12 @@ void Smt2::addFloatingPointOperators() {
 }
 
 void Smt2::addSepOperators() {
+  //addOperator(kind::SEP_NIL, "sep.nil");
   addOperator(kind::SEP_STAR, "sep");
   addOperator(kind::SEP_PTO, "pto");
   addOperator(kind::SEP_WAND, "wand");
   addOperator(kind::EMP_STAR, "emp");
+  //Parser::addOperator(kind::SEP_NIL);
   Parser::addOperator(kind::SEP_STAR);
   Parser::addOperator(kind::SEP_PTO);
   Parser::addOperator(kind::SEP_WAND);

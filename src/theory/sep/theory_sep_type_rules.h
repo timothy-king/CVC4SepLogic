@@ -33,6 +33,14 @@ public:
   }
 };
 
+class SepNilTypeRule {
+public:
+  inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)
+    throw (TypeCheckingExceptionPrivate, AssertionException) {
+    return n[0].getType(check);    
+  }
+};
+
 class EmpStarTypeRule {
 public:
   inline static TypeNode computeType(NodeManager* nodeManager, TNode n, bool check)

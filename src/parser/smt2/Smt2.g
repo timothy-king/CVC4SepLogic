@@ -113,6 +113,7 @@ namespace CVC4 {
 #include "util/rational.h"
 #include "util/hash.h"
 #include "util/floatingpoint.h"
+#include "theory/type_enumerator.h"
 #include <vector>
 #include <set>
 #include <string>
@@ -1663,7 +1664,9 @@ term[CVC4::Expr& expr, CVC4::Expr& expr2]
                           << f2 << " " << type <<  std::endl;
         expr = MK_CONST( ::CVC4::EmptySet(type) );
       } else if(f.getKind() == CVC4::kind::NIL_REF) {
-        expr = MK_CONST( ::CVC4::NilRef(type) );
+        //CVC4::theory::TypeEnumerator te(TypeNode::fromType(type));
+        //expr = MK_EXPR(CVC4::kind::SEP_NIL, (*te).toExpr() );
+        expr = MK_EXPR(CVC4::kind::SEP_NIL, PARSER_STATE->mkVar("__tmp", type) );
       } else {
         if(f.getType() != type) {
           PARSER_STATE->parseError("Type ascription not satisfied.");

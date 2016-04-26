@@ -375,6 +375,10 @@ void TheorySep::check(Effort e) {
               if( s_lbl!=ss ){
                 conc = s_lbl.eqNode( ss );
               }
+              TypeEnumerator te(s_atom[0].getType());
+              Node ssn = NodeManager::currentNM()->mkNode( kind::EQUAL, s_atom[0], 
+                           NodeManager::currentNM()->mkNode( kind::SEP_NIL, *te ) ).negate();
+              conc = conc.isNull() ? ssn : NodeManager::currentNM()->mkNode( kind::AND, conc, ssn );
             }else{
               //labeled emp should be rewritten
               Assert( false );

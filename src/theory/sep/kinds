@@ -32,6 +32,7 @@ enumerator REF_TYPE \
     "::CVC4::theory::sep::RefEnumerator" \
     "theory/sep/type_enumerator.h"
 
+operator SEP_NIL 1 "separation nil"
 operator EMP_STAR 1 "separation empty heap"
 operator SEP_PTO 2 "points to relation"
 operator SEP_STAR 2: "separation star"
@@ -39,8 +40,8 @@ operator SEP_WAND 2 "separation magic wand"
 operator SEP_LABEL 2 "separation label"
 
 typerule NIL_REF ::CVC4::theory::sep::NilRefTypeRule
+typerule SEP_NIL ::CVC4::theory::sep::SepNilTypeRule
 typerule EMP_STAR ::CVC4::theory::sep::EmpStarTypeRule
-
 typerule SEP_PTO ::CVC4::theory::sep::SepPtoTypeRule
 typerule SEP_STAR ::CVC4::theory::sep::SepStarTypeRule
 typerule SEP_WAND ::CVC4::theory::sep::SepWandTypeRule
