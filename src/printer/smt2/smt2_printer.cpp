@@ -316,6 +316,10 @@ void Smt2Printer::toStream(std::ostream& out, TNode n,
     }
     return;
   }
+  if( n.getKind() == kind::SEP_NIL ){
+    out << "sep.nil";
+    return;
+  }
 
   bool stillNeedToPrintParams = true;
   bool forceBinary = false; // force N-ary to binary when outputing children
