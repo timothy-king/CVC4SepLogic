@@ -375,9 +375,7 @@ void TheorySep::check(Effort e) {
               if( s_lbl!=ss ){
                 conc = s_lbl.eqNode( ss );
               }
-              TypeEnumerator te(s_atom[0].getType());
-              Node ssn = NodeManager::currentNM()->mkNode( kind::EQUAL, s_atom[0], 
-                           NodeManager::currentNM()->mkNode( kind::SEP_NIL, *te ) ).negate();
+              Node ssn = NodeManager::currentNM()->mkNode( kind::EQUAL, s_atom[0], getNilRef(s_atom[0].getType()) ).negate();
               conc = conc.isNull() ? ssn : NodeManager::currentNM()->mkNode( kind::AND, conc, ssn );
             }else{
               //labeled emp should be rewritten
@@ -681,7 +679,7 @@ void TheorySep::check(Effort e) {
       }
       if( !addedLemma ){
         if( needAddLemma ){
-          Trace("sep-model") << "WARNING : could not find refinement lemma!!!" << std::endl;
+          Trace("sep-process") << "WARNING : could not find refinement lemma!!!" << std::endl;
           Assert( false );
           d_out->setIncomplete();
         }
@@ -704,6 +702,10 @@ void TheorySep::check(Effort e) {
               Trace("sep-model") << std::endl;
             }
           }
+          Node nil = getNilRef( it->first );
+          Node vnil = d_last_model->getRepresentative( nil );
+          Trace("sep-model") << "sep.nil = " << vnil << std::endl;
+          Trace("sep-model") << std::endl;
         }
       }
     }
@@ -935,6 +937,18 @@ Node TheorySep::getBaseLabel( TypeNode tn ) {
     //Trace("sep-lemma") << "Sep::Lemma: base reference bound for " << tn << " : " << slem << std::endl;
     //d_out->lemma( slem );
     return n_lbl;
+  }else{
+    return it->second;
+  }
+}
+
+Node TheorySep::getNilRef( TypeNode tn ) {
+  std::map< TypeNode, Node >::iterator it = d_nil_ref.find( tn );
+  if( it==d_nil_ref.end() ){
+    TypeEnumerator te(tn);
+    Node nil = NodeManager::currentNM()->mkNode( kind::SEP_NIL, *te );
+    d_nil_ref[tn] = nil;
+    return nil;
   }else{
     return it->second;
   }

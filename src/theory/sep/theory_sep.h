@@ -202,6 +202,7 @@ class TheorySep : public Theory {
   std::map< TypeNode, TypeNode > d_loc_to_data_type;
   //information about types
   std::map< TypeNode, Node > d_base_label;
+  std::map< TypeNode, Node > d_nil_ref;
   //reference bound
   std::map< TypeNode, Node > d_reference_bound;
   std::map< TypeNode, Node > d_reference_bound_max;
@@ -231,6 +232,7 @@ class TheorySep : public Theory {
   TypeNode getReferenceType2( Node atom, int& card, int index, Node n, std::map< Node, int >& visited);
   //get the base label for the spatial assertion
   Node getBaseLabel( TypeNode tn );
+  Node getNilRef( TypeNode tn );
   Node getLabel( Node atom, int child, Node lbl );
   Node applyLabel( Node n, Node lbl, std::map< Node, Node >& visited );
   void getLabelChildren( Node atom, Node lbl, std::vector< Node >& children, std::vector< Node >& labels );
