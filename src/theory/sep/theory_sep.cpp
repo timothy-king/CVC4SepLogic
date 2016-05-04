@@ -831,7 +831,9 @@ TypeNode TheorySep::getReferenceType2( Node atom, int& card, int index, Node n, 
         d_loc_to_data_type[tn1] = tn2;
       }else{
         if( itt->second!=tn2 ){
-          Trace("sep-type") << "ERROR: location type " << tn1 << " is already associated with data type " << tn2 << " (offending atom is " << atom << ")" << std::endl;
+          std::stringstream ss;
+          ss << "ERROR: location type " << tn1 << " is already associated with data type " << itt->second << ", offending atom is " << atom << " with data type " << tn2 << std::endl;
+          throw LogicException(ss.str());
           Assert( false );
         }
       }
