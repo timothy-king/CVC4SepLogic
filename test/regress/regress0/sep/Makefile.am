@@ -50,7 +50,8 @@ TESTS =	\
   chain-int.smt2 \
   sep-neg-swap.smt2 \
   sep-neg-nstrict2.smt2 \
-  dispose-list-4-init.smt2
+  dispose-list-4-init.smt2 \
+  wand-0526-sat.smt2
 
 
 FAILING_TESTS =

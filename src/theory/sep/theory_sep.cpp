@@ -1097,9 +1097,7 @@ Node TheorySep::instantiateLabel( Node n, Node o_lbl, Node lbl, Node lbl_v, std:
             children.push_back( NodeManager::currentNM()->mkNode( n[1].getType().isBoolean() ? kind::IFF : kind::EQUAL, n[1], it->second ) );
           }
         }else{
-          //value of data not explicitly stated, assume disequal
-          Trace("sep-inst-debug") << "Return false, data for " << vr << " was not specified." << std::endl;
-          return NodeManager::currentNM()->mkConst( false );
+          Trace("sep-inst-debug") << "Data for " << vr << " was not specified, do not add condition." << std::endl;
         }
       } 
       children.push_back( NodeManager::currentNM()->mkNode( kind::EQUAL, NodeManager::currentNM()->mkNode( kind::SINGLETON, n[0] ), lbl_v ) );
